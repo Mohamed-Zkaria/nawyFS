@@ -19,12 +19,15 @@ Run from this directory (`server`):
 - `npm test` — Jest unit tests
 - `npm run test:watch` — Jest in watch mode
 - `npm run test:cov` — Jest with coverage
-- `npm run test:e2e` — e2e tests (uses `test/jest-e2e.json` config)
+- `npm run test:e2e` — e2e tests (uses `test/jest-e2e.json` config; spins up a real Postgres via testcontainers — needs Docker running)
+- `npm run db:migrate` / `npm run db:seed` — ts-node CLI, reads `DB_*` from `process.env`
 
-Run a single test file: `npm test -- app.controller.spec.ts` (Jest `rootDir` is `src`, spec files matched by `.*\.spec\.ts$`; e2e specs live in `test/` and run via `test:e2e`).
+Run a single test file: `npm test -- apartments.service.spec.ts` (Jest `rootDir` is `src`, spec files matched by `.*\.spec\.ts$`; e2e specs live in `test/` and run via `test:e2e`).
 
 ## Architecture
 
-- NestJS 10 + TypeScript, currently the unmodified `nest new` scaffold: `src/main.ts` bootstraps `AppModule`; `src/app.module.ts` wires the single root `AppController`/`AppService`. No other modules, controllers, providers, database, or config layer exist yet.
-- `tsconfig.json` has `strictNullChecks: false` and `noImplicitAny: false` (Nest CLI defaults) — do not assume strict-mode guarantees.
-- Path root is `src` (`nest-cli.json` `sourceRoot`); `tsconfig.json` `baseUrl` is `./` with no path aliases configured.
+- NestJS 11 + TypeScript, `strict: true` (no loosening flags). Path alias `@/*` → `src/*` (no `baseUrl`, per `tsconfig.json`'s `paths` — avoids a TS deprecation warning).
+- `src/modules/{apartments,projects,users,auth}/` — each follows controller → service → repository-port → TypeORM adapter, with an in-memory adapter for unit tests (see root `README.md` → "Architecture highlights" for the SOLID rationale). `src/config/` — Zod-validated env, `AppConfigService` is the only class that touches `ConfigService`. `src/common/` — the error/success envelope, exception filter, shared DTOs/utils.
+- Auth: global `JwtAuthGuard` + `RolesGuard` + `ThrottlerGuard` (secure-by-default — every endpoint needs `@Public()` or it's inaccessible). Seeded admin from `ADMIN_EMAIL`/`ADMIN_PASSWORD`.
+- Apartment images are admin-supplied external URLs (`apartment_images.url`), validated with `@IsUrl()` — there is no file-upload/storage pipeline in this project (see root `README.md` → "Deviations from InitialSystemDesign").
+- See root `README.md` for the full API summary, env var tables, and design decisions/tradeoffs.

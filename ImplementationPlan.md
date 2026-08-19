@@ -68,16 +68,55 @@
   fully working, proving nothing is baked in. No-hardcoding grep audit (§15) passes — every `localhost`/
   `http://` hit in `src/` is a documented env-var fallback default, not a baked-in value.
 
-**Not yet done — pick up here:**
-1. **Live manual verification** via curl/Swagger for the auth/create endpoints specifically (see the auth
-   item above) — optional at this point given e2e coverage, but still on the original list. Docker-level
-   manual verification (health/listing/detail/login) is now done as part of Phase 3.
-2. **Rest of Phase 4** — `PATCH`/`DELETE` apartments, image upload + `StorageService` + static serving +
-   the `/uploads` route handler, client login page + session cookie handler + `/admin/*` pages. Not started.
-3. **Phases 5–7** (hardening, coverage/docs, polish) — not started.
+- **Rest of Phase 4 — admin CRUD + client admin UI**: done, with one major scope change from this document's
+  original design. **The user explicitly rejected the file-upload/storage design** (§8 below, `StorageService`,
+  Multer, local-disk/S3 adapters, `/uploads` static serving) — **apartment images are admin-supplied external
+  URLs**, validated with `@IsUrl()`, nothing else. See `README.md` → "Deviations from `InitialSystemDesign/`"
+  for the full reasoning; §8 and the upload-related parts of §9/§10/§11 below are **superseded**, not current.
+  - Server: `PATCH /apartments/:id` (partial update via a `withoutUndefined` merge, shared by the TypeORM and
+    in-memory repos), `DELETE /apartments/:id` (soft delete, 204), `POST /apartments/:id/images` (`{urls:
+    string[]}`), `DELETE /apartments/:id/images/:imageId`. New migration `ApartmentImagesUrl` collapses
+    `apartment_images`' `storage_key`/`original_name`/`mime_type`/`size_bytes` into one `url` column.
+    `ApartmentMapper` no longer needs `AppConfigService` at all (URLs are stored verbatim, not composed).
+    16 new unit tests, 21 new e2e cases — **42 e2e passing total**, run for real against testcontainers.
+  - Client: `/login` (Server Action, sets an httpOnly session cookie), `/admin/*` (auth-gated layout reading
+    the cookie server-side → `/auth/me`), apartment list/create/edit pages, an `ImageManager` component,
+    all admin mutations via Server Actions (`app/admin/_actions/apartments.ts`) — zero client-side fetch layer
+    for the API. `next/image`'s `unoptimized` prop is required on every apartment-image `<Image>` (external
+    URLs can't satisfy `images.remotePatterns`, which is frozen at build time) — see
+    `lib/utils/is-external-url.ts`.
+  - **Verified live end-to-end via browser automation** against the full `docker compose` stack: login →
+    admin list → create with an image URL → image renders on the public listing card *and* detail gallery →
+    edit page pre-fill → delete → logout → unauthenticated `/admin/*` correctly redirects to `/login`.
+- **Phase 5 — Production hardening**: done, selectively. Added: `helmet()`, env-driven CORS
+  (`app.enableCors()`, no extra package needed), two-named-throttler rate limiting (`@nestjs/throttler` —
+  a tight `auth` bucket only `AuthController` is subject to, everything else opts out with
+  `@SkipThrottle({auth:true})`; both limits env-driven and auto-raised in `NODE_ENV=test` so e2e doesn't
+  429 itself), a real DB-aware `/health` (direct `SELECT 1` via injected `DataSource`, not `@nestjs/terminus`
+  — one check didn't justify that dependency; returns 503 on failure). **Deliberately skipped**:
+  `nestjs-pino` structured logging — noted under `README.md` → "What's next," Nest's built-in logger ships
+  instead. A dedicated `test/rate-limit.e2e-spec.ts` proves the `login 429` case for real (own module registry
+  so it can override `AUTH_RATE_LIMIT_LIMIT` without breaking every other suite's high test-env default).
+- **Phase 6 — Documentation**: done for the core deliverable. Root `README.md` rewritten from a one-line stub
+  to a full writeup (quickstart, API summary, architecture, deviations, decisions, patterns rejected,
+  non-goals, env tables, testing, what's next). Both projects' `CLAUDE.md` corrected (no longer describe
+  "unmodified scaffold"). `InitialSystemDesign/erd.md` updated to the shipped schema; the sequence diagrams
+  were left as-is since their high-level flow doesn't actually contradict what shipped. **Not done**: filling
+  server coverage-threshold gaps, a client Vitest suite (none exists — see README "What's next").
+- **Phase 7 — Polish**: not started (NICE priority — `openapi-typescript`, CI, magic-byte validation is now
+  moot since there's no upload pipeline, dark-mode toggle, blur placeholders).
+
+**Not yet done:**
+1. Client test suite (Vitest) — none exists.
+2. CI (GitHub Actions).
+3. `nestjs-pino` structured logging.
+4. Server test coverage thresholds not formally enforced/audited against §12's stated targets.
 
 Stop-after-each-phase is a standing instruction from the user — do not chain multiple phases in one
-uninterrupted run; report and wait after finishing each one.
+uninterrupted run; report and wait after finishing each one. This session was an explicit exception: the user
+asked to complete the remaining `ImplementationPlan.md` phases together with a "production grade" pass,
+confirming first before any scope not in `NawySeniorTask.md`'s literal text (the admin UI was confirmed;
+the throttler was confirmed after a mid-session question).
 
 ---
 

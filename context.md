@@ -12,10 +12,53 @@ Docker containers are running — `docker compose down -v` was run before ending
 Desktop itself was left running (started this session to run e2e tests and Phase 3 verification; not a
 per-task temp resource, and the next phase will need it again).
 
-Immediate next step (see ImplementationPlan.md Status): rest of Phase 4 — `PATCH`/`DELETE` apartments,
-image upload + storage module + static serving + `/uploads` route handler, client login/admin pages.
-Phase 3 (Docker) is now done and verified live; the e2e-test item is done; the auth/create endpoints are
-verified both via e2e and via live curl through the compose stack.
+Immediate next step (see ImplementationPlan.md Status): what's left is Vitest for the client, CI, and
+`nestjs-pino` structured logging (all deliberately deferred — see README.md "What's next"). Everything else
+through Phase 6 is done and verified live: full apartment CRUD, admin panel, Docker hardening, docs.
+
+## This session (rest of Phase 4 + Phase 5 + Phase 6)
+
+- **User explicitly rejected the file-upload/storage design** mid-session, before any of it was built —
+  no `StorageService`, no Multer, no local-disk/S3 adapters, no `/uploads` static serving. Apartment images
+  are admin-supplied external URLs (`@IsUrl()` on `POST /apartments/:id/images`'s `{urls: string[]}`), full
+  stop. This is the single biggest deviation from `ImplementationPlan.md`'s original design (§8, and the
+  upload-related parts of §9/§10/§11) — see `README.md` → "Deviations" for the reasoning captured for
+  whoever reads this next. **If a future session is tempted to "finish" the storage module from the original
+  plan text, don't — it was a deliberate, explicit rejection, not an oversight.**
+- **The user pushed back on scope twice more this session** (asked "why are you implementing a throttle?"
+  before I'd finished explaining it, and separately asked to confirm before adding anything not in
+  `NawySeniorTask.md`'s literal text before the admin UI was built). Both times the right move was to stop,
+  explain the reasoning in ≤1 short paragraph, and either get an explicit go/no-go (`AskUserQuestion` for the
+  admin UI) or a quick keep/drop confirmation in chat (throttler) — not to keep building and explain after
+  the fact. **Read this as a standing preference**: this user wants to approve non-obvious scope *before* it's
+  built, not review it after. Also explicitly asked for simple, easy-to-follow solutions — avoid
+  over-engineering (already the norm in this codebase: skipped `@nestjs/terminus` for one DB check, kept the
+  file-upload rejection minimal rather than half-building a fallback).
+- **`next/image` cannot optimize admin-supplied external URLs** — `images.remotePatterns` is frozen at build
+  time and can't allow-list a hostname nobody knows about until an admin pastes a link at runtime. Fixed with
+  `unoptimized={isExternalUrl(url)}` on every apartment-image `<Image>` (`ApartmentCard`, `ApartmentGallery`,
+  `ImageManager`) — plain `<img>`-equivalent rendering for those, full optimization stays for the local
+  placeholder SVG. This is a direct, structural consequence of the URL-based image decision above; if that
+  decision is ever revisited, this fix's reasoning should be revisited with it.
+- **Every new TypeORM migration must be added to `test/setup/testcontainers-global-setup.ts`'s explicit
+  import + `migrations: [...]` array too** — it can't glob-scan `@/`-aliased migration files (per that file's
+  own comment), so adding `ApartmentImagesUrl1735000000003` there was a separate step from writing the
+  migration itself. Forgetting it doesn't error at migration time — it silently leaves the e2e Postgres on
+  the old schema, and every query touching the changed column fails with a `column ... does not exist`
+  `QueryFailedError` that looks like an app bug, not a missing-migration-registration bug. **The real Docker
+  `migrator` service is unaffected** (`data-source.ts` globs `migrations/*.{ts,js}, so it always picks up new
+  files) — this trap is specific to the e2e test harness.
+- **Server Actions can set cookies directly** (`next/headers`'s `cookies().set()`/`.delete()`), which let the
+  admin login/logout skip the Route Handler (`app/api/session/route.ts`) that `ImplementationPlan.md` §7
+  originally specified — two Server Actions (`loginAction`, `logoutAction`) do the whole job with less code.
+  Same httpOnly-cookie/server-side-`admin/layout.tsx`-gate design either way; only the write path changed.
+- **Live-verified the full admin loop via browser automation** (not just curl/e2e): login → create an
+  apartment with a real external image URL → image renders correctly on both the public listing card *and*
+  the detail gallery → edit page pre-fills correctly → delete → logout → unauthenticated `/admin/*` redirects
+  to `/login`. One transient gotcha: a freshly-added image can take a moment to paint after the request
+  completes (200 in Network tab) — a screenshot taken immediately after can show blank/gray where the image
+  will be; `zoom` a moment later confirmed it was actually there. Not a bug, just a screenshot-timing thing to
+  remember when browser-verifying anything image-related.
 
 ## User working style — apply these without being asked again
 
