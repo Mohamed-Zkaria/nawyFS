@@ -194,9 +194,16 @@ export function ApartmentForm({
       )}
 
       {state.error && (
-        <p role="alert" className="text-sm text-red-600">
-          {state.error}
-        </p>
+        <div role="alert" className="text-sm text-red-600">
+          <p>{state.error}</p>
+          {state.details && state.details.length > 0 && (
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              {state.details.map((detail) => (
+                <li key={detail}>{detail}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       <button

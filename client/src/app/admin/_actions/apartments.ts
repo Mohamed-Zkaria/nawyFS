@@ -9,12 +9,26 @@ import type { ApartmentDetail } from '@/lib/api/types';
 
 export interface FormState {
   error?: string;
+  details?: string[];
 }
 
 async function requireToken(): Promise<string> {
   const token = await getSessionToken();
   if (!token) throw new Error('Not authenticated');
   return token;
+}
+
+// class-validator messages are field-first ("price must not be less than
+// 0"), which is exactly what an admin needs to fix the form — the generic
+// `error.message` ("Validation failed") on its own tells them nothing.
+function toFormState(err: unknown, fallback: string): FormState {
+  if (err instanceof ApiError) {
+    const details = Array.isArray(err.details)
+      ? err.details.filter((d): d is string => typeof d === 'string')
+      : undefined;
+    return { error: err.message, details };
+  }
+  return { error: fallback };
 }
 
 function parseImageUrls(raw: FormDataEntryValue | null): string[] {
@@ -61,9 +75,7 @@ export async function createApartmentAction(
     });
     apartment = res.data;
   } catch (err) {
-    return {
-      error: err instanceof ApiError ? err.message : 'Failed to create apartment.',
-    };
+    return toFormState(err, 'Failed to create apartment.');
   }
 
   const imageUrls = parseImageUrls(formData.get('imageUrls'));
@@ -101,9 +113,7 @@ export async function updateApartmentAction(
       body: JSON.stringify(payload),
     });
   } catch (err) {
-    return {
-      error: err instanceof ApiError ? err.message : 'Failed to update apartment.',
-    };
+    return toFormState(err, 'Failed to update apartment.');
   }
 
   revalidatePath('/apartments');
@@ -144,9 +154,7 @@ export async function addImagesAction(
       body: JSON.stringify({ urls }),
     });
   } catch (err) {
-    return {
-      error: err instanceof ApiError ? err.message : 'Failed to add images.',
-    };
+    return toFormState(err, 'Failed to add images.');
   }
 
   revalidatePath('/apartments');
