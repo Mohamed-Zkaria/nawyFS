@@ -7,13 +7,15 @@
 ## How to resume
 
 Tell the next session: *"Read ImplementationPlan.md's Status section and context.md, then continue."*
-Everything is committed to git on `main` (nothing pushed to `origin`). No background processes are
-running — any dev server / Docker container from a previous session was stopped before ending it.
-(Docker Desktop itself was left running at the end of this session — it wasn't started as a per-task temp
-resource and Phase 3 needs it next anyway.)
+Everything is committed to git on `main` (nothing pushed to `origin`). No background processes and no
+Docker containers are running — `docker compose down -v` was run before ending this session. Docker
+Desktop itself was left running (started this session to run e2e tests and Phase 3 verification; not a
+per-task temp resource, and the next phase will need it again).
 
-Immediate next step (see ImplementationPlan.md Status): Phase 3 — Docker one-command. The e2e-test item is
-now done (see below); the auth/create endpoints are verified.
+Immediate next step (see ImplementationPlan.md Status): rest of Phase 4 — `PATCH`/`DELETE` apartments,
+image upload + storage module + static serving + `/uploads` route handler, client login/admin pages.
+Phase 3 (Docker) is now done and verified live; the e2e-test item is done; the auth/create endpoints are
+verified both via e2e and via live curl through the compose stack.
 
 ## User working style — apply these without being asked again
 
@@ -49,6 +51,15 @@ now done (see below); the auth/create endpoints are verified.
    rate limiting (`@nestjs/throttler`), no client-side login UI — those remain in the full Phase 4.
 5. **`apartment_images` stays empty** through everything built so far — every apartment/card/gallery
    falls back to `public/apartment-placeholder.svg`. Real uploads are still Phase 4 (storage module).
+6. **The `api` service's `uploads` named volume is declared in `docker-compose.yml` now, in Phase 3,
+   even though nothing writes to it yet** (matches the plan's own compose spec in §11) — the
+   `server/Dockerfile`'s `mkdir -p /app/uploads && chown -R node:node /app` step it depends on is cheap and
+   forward-looking; wiring the volume now means Phase 4's storage module needs zero compose changes later.
+7. **`db`'s Postgres port is *not* published to the host** in `docker-compose.yml` (no `ports:` on that
+   service) — nothing in the one-command requirement needs host-side `psql` access, and every other service
+   reaches it over the internal compose network by service name (`db:5432`). Smaller attack surface, and one
+   fewer port to collide with a host-side Postgres. Add a `ports:` mapping if local `psql`-against-the-
+   compose-DB access is ever wanted.
 
 ## Non-obvious bugs hit and fixed (won't be re-discovered from reading the code alone)
 
@@ -108,6 +119,18 @@ now done (see below); the auth/create endpoints are verified.
   the guard went global — needs the decorator explicitly. Fixed by adding `@Public()` to all four handlers.
   **Checklist for any future public endpoint**: if a controller method has no `@Roles()`, it needs
   `@Public()`, full stop — there is no third state.
+- **Nest 11's route matcher (`path-to-regexp`) rejects the plan's literal `exclude: ['uploads/(.*)']`
+  glob syntax** — it's a *legacy* pattern now, auto-converted at boot with a `LegacyRouteConverter` warning
+  (`Unsupported route path: "uploads/(.*)"` → auto-converts to `uploads/{*path}`). Currently harmless (no
+  `/uploads` route exists yet to be excluded, and `/health` — the only excluded-prefix route so far — still
+  resolves fine), but when Phase 4 adds the real `/uploads/[key]` static-serving route, write the exclude as
+  `'uploads/{*path}'` directly in `bootstrap.ts` rather than leaving the plan's original `(.*)` syntax to be
+  silently auto-converted.
+- **`docker compose start <one-service>` re-evaluates that service's `depends_on` conditions**, including
+  re-running one-shot services like `migrator` if its `service_completed_successfully` condition is being
+  depended on. Confirmed while testing `api`'s graceful shutdown (`docker compose stop api` then
+  `start api` re-ran `migrator`) — harmless here because the seed is idempotent (§12 of the plan), but worth
+  knowing so a re-run migrator log line isn't mistaken for something wrong.
 
 ## Conventions established (follow these for anything new)
 

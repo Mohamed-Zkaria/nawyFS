@@ -53,14 +53,28 @@
 3. **Live manual verification** of the new endpoints (temp Postgres + seed + curl/Swagger) — still not done;
    the e2e suite exercises the same paths but a from-scratch manual pass hasn't happened.
 
+- **Phase 3 — Docker one-command**: done. `server/Dockerfile` (5-stage: base/deps/build/prod-deps/runner on
+  `node:24-alpine`, uploads dir pre-created + chowned before `USER node`, `HEALTHCHECK` via Node's `fetch`
+  against `/health`). `client/Dockerfile` (standalone output, copies `.next/standalone` + `.next/static` +
+  `public`, zero build args). `docker-compose.yml` at repo root: `db` (healthcheck via `pg_isready`),
+  `migrator` (one-shot `migrate && seed`, `restart: "no"`, gated on `db: service_healthy`), `api` (gated on
+  `migrator: service_completed_successfully`, `uploads` named volume, `init: true`,
+  `stop_grace_period: 15s`), `web` (gated on `api: service_healthy`, `API_INTERNAL_URL: http://api:4000/api/v1`).
+  `server/.env.docker` committed with dev-only values so `docker compose up --build` needs zero setup on a
+  clean clone. `.dockerignore` in both projects. `next.config.ts` gained `output: "standalone"`.
+  **Verified live, repeatedly** (see context.md for the full log): default config → all 4 services healthy,
+  health/listing/detail/login all exercised over HTTP, graceful shutdown < 1s; re-ran with a
+  `docker-compose.override.yml` forcing custom DB credentials + `API_PORT=4100`/`WEB_PORT=3100` → still
+  fully working, proving nothing is baked in. No-hardcoding grep audit (§15) passes — every `localhost`/
+  `http://` hit in `src/` is a documented env-var fallback default, not a baked-in value.
+
 **Not yet done — pick up here:**
-1. **Live manual verification** (see above) — optional at this point given e2e coverage, but still on the
-   original list.
-2. **Phase 3 — Docker one-command** (next MUST-priority phase per §13 below) — not started. No `Dockerfile`
-   in either project, no `docker-compose.yml`.
-3. **Rest of Phase 4** — `PATCH`/`DELETE` apartments, image upload + `StorageService` + static serving +
+1. **Live manual verification** via curl/Swagger for the auth/create endpoints specifically (see the auth
+   item above) — optional at this point given e2e coverage, but still on the original list. Docker-level
+   manual verification (health/listing/detail/login) is now done as part of Phase 3.
+2. **Rest of Phase 4** — `PATCH`/`DELETE` apartments, image upload + `StorageService` + static serving +
    the `/uploads` route handler, client login page + session cookie handler + `/admin/*` pages. Not started.
-4. **Phases 5–7** (hardening, coverage/docs, polish) — not started.
+3. **Phases 5–7** (hardening, coverage/docs, polish) — not started.
 
 Stop-after-each-phase is a standing instruction from the user — do not chain multiple phases in one
 uninterrupted run; report and wait after finishing each one.

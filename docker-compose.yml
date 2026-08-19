@@ -1,0 +1,84 @@
+# No `version:` key — obsolete in Compose v2+.
+#
+# `docker compose up --build` must work on a freshly cloned repo with no
+# setup: every ${VAR} below has a `:-default`, and server/.env.docker is
+# committed with dev-only values (the server's own env schema still refuses
+# those defaults when NODE_ENV=production). Two gotchas worth knowing:
+#   - `${VAR}` interpolation here reads the *host* shell/a root `.env` file;
+#     `env_file:` injects vars into the *container*. Different mechanisms —
+#     easily conflated, and this file uses both.
+#   - `env_file:` values are overridden by an explicit `environment:` block
+#     on the same service, should one ever be added.
+# Concretely: `db`'s POSTGRES_USER/PASSWORD/DB below and `server/.env.docker`'s
+# DB_USERNAME/DB_PASSWORD/DB_NAME are two independent places carrying the
+# same three values — they default in sync, but nothing enforces that if
+# either is edited later.
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-nawy}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-nawy_dev_only}
+      POSTGRES_DB: ${DB_NAME:-nawy}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USERNAME:-nawy} -d ${DB_NAME:-nawy}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: migrate then seed, then exit. Runs to completion *before* the
+  # API accepts a single request — explicit in `docker compose logs`,
+  # doesn't race a future multi-replica `api`, and keeps the TypeORM CLI
+  # out of the runtime image (see server/Dockerfile's prod-deps stage).
+  migrator:
+    build:
+      context: ./server
+      target: runner
+    env_file:
+      - ./server/.env.docker
+    command: ["sh", "-c", "node dist/database/cli.js migrate && node dist/database/cli.js seed"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: ./server
+      target: runner
+    env_file:
+      - ./server/.env.docker
+    ports:
+      - "${API_PORT:-4000}:4000"
+    volumes:
+      - uploads:/app/uploads
+    init: true
+    stop_grace_period: 15s
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    # Healthcheck itself is declared in server/Dockerfile (HEALTHCHECK) —
+    # `service_healthy` below reads that.
+
+  web:
+    build:
+      context: ./client
+    environment:
+      API_INTERNAL_URL: http://api:4000/api/v1
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:
