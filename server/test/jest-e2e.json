@@ -8,5 +8,8 @@
   },
   "moduleNameMapper": {
     "^@/(.*)$": "<rootDir>/../src/$1"
-  }
+  },
+  "globalSetup": "<rootDir>/setup/testcontainers-global-setup.ts",
+  "globalTeardown": "<rootDir>/setup/testcontainers-global-teardown.ts",
+  "testTimeout": 60000
 }

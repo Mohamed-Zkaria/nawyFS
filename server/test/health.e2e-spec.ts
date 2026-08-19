@@ -1,23 +1,15 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
-import { AppModule } from '../src/app.module';
-import { configureApp } from '../src/bootstrap';
+import request from 'supertest';
+import { createTestApp } from './setup/test-app';
 
 describe('Health (e2e)', () => {
   let app: INestApplication;
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    configureApp(app);
-    await app.init();
+  beforeAll(async () => {
+    app = await createTestApp();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await app.close();
   });
 
@@ -26,8 +18,8 @@ describe('Health (e2e)', () => {
       .get('/health')
       .expect(200)
       .expect((res) => {
-        expect(res.body.status).toBe('ok');
-        expect(typeof res.body.timestamp).toBe('string');
+        expect(res.body.data.status).toBe('ok');
+        expect(typeof res.body.data.timestamp).toBe('string');
       });
   });
 });

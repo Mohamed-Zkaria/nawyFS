@@ -14,6 +14,15 @@ describe('validateEnv', () => {
       LOG_PRETTY: true,
       SWAGGER_ENABLED: true,
       SWAGGER_PATH: 'api/docs',
+      DB_HOST: 'localhost',
+      DB_PORT: 5432,
+      DB_USERNAME: 'nawy',
+      DB_PASSWORD: 'nawy_dev_only',
+      DB_NAME: 'nawy',
+      DB_SSL: false,
+      DB_LOGGING: false,
+      DB_POOL_MAX: 10,
+      PUBLIC_UPLOADS_PATH: '/uploads',
     });
   });
 

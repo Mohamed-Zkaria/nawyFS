@@ -23,6 +23,21 @@ export const envSchema = z.object({
   LOG_PRETTY: booleanEnvVar(true),
   SWAGGER_ENABLED: booleanEnvVar(true),
   SWAGGER_PATH: z.string().min(1).default('api/docs'),
+
+  DB_HOST: z.string().min(1).default('localhost'),
+  DB_PORT: z.coerce.number().int().min(1).max(65535).default(5432),
+  DB_USERNAME: z.string().min(1).default('nawy'),
+  DB_PASSWORD: z.string().min(1).default('nawy_dev_only'),
+  DB_NAME: z.string().min(1).default('nawy'),
+  DB_SSL: booleanEnvVar(false),
+  DB_LOGGING: booleanEnvVar(false),
+  DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+
+  // Only the public URL prefix is needed until Phase 4 wires the actual
+  // storage/upload feature (UPLOAD_DIR, size limits, etc.) — the mapper
+  // needs to compose image URLs from config starting now, even though no
+  // apartment has any images yet.
+  PUBLIC_UPLOADS_PATH: z.string().min(1).default('/uploads'),
 });
 
 export type Env = z.infer<typeof envSchema>;

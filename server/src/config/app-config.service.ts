@@ -3,11 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import { Env } from '@/config/env.validation';
 import {
   AppConfig,
+  DbConfig,
   LoggingConfig,
   SwaggerConfig,
+  UploadsConfig,
   toAppConfig,
+  toDbConfig,
   toLoggingConfig,
   toSwaggerConfig,
+  toUploadsConfig,
 } from '@/config/configuration';
 
 @Injectable()
@@ -34,6 +38,14 @@ export class AppConfigService {
     return toSwaggerConfig(this.snapshot());
   }
 
+  get db(): DbConfig {
+    return toDbConfig(this.snapshot());
+  }
+
+  get uploads(): UploadsConfig {
+    return toUploadsConfig(this.snapshot());
+  }
+
   private snapshot(): Env {
     return {
       NODE_ENV: this.configService.get('NODE_ENV', { infer: true }),
@@ -51,6 +63,17 @@ export class AppConfigService {
         infer: true,
       }),
       SWAGGER_PATH: this.configService.get('SWAGGER_PATH', { infer: true }),
+      DB_HOST: this.configService.get('DB_HOST', { infer: true }),
+      DB_PORT: this.configService.get('DB_PORT', { infer: true }),
+      DB_USERNAME: this.configService.get('DB_USERNAME', { infer: true }),
+      DB_PASSWORD: this.configService.get('DB_PASSWORD', { infer: true }),
+      DB_NAME: this.configService.get('DB_NAME', { infer: true }),
+      DB_SSL: this.configService.get('DB_SSL', { infer: true }),
+      DB_LOGGING: this.configService.get('DB_LOGGING', { infer: true }),
+      DB_POOL_MAX: this.configService.get('DB_POOL_MAX', { infer: true }),
+      PUBLIC_UPLOADS_PATH: this.configService.get('PUBLIC_UPLOADS_PATH', {
+        infer: true,
+      }),
     };
   }
 }
