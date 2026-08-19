@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Apartment } from '@/modules/apartments/entities/apartment.entity';
+import { ApartmentImage } from '@/modules/apartments/entities/apartment-image.entity';
 import { ApartmentRepositoryPort } from '@/modules/apartments/apartment.repository.port';
 import { TypeOrmApartmentRepository } from '@/modules/apartments/repositories/typeorm-apartment.repository';
 import { ApartmentMapper } from '@/modules/apartments/mappers/apartment.mapper';
@@ -9,7 +10,10 @@ import { ApartmentsController } from '@/modules/apartments/apartments.controller
 import { ProjectsModule } from '@/modules/projects/projects.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Apartment]), ProjectsModule],
+  imports: [
+    TypeOrmModule.forFeature([Apartment, ApartmentImage]),
+    ProjectsModule,
+  ],
   controllers: [ApartmentsController],
   providers: [
     ApartmentsService,

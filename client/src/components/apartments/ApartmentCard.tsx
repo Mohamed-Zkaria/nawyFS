@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ApartmentSummary } from "@/lib/api/types";
 import { formatArea, formatPrice } from "@/lib/utils/format";
+import { isExternalUrl } from "@/lib/utils/is-external-url";
 
 interface ApartmentCardProps {
   apartment: ApartmentSummary;
@@ -22,6 +23,7 @@ export function ApartmentCard({ apartment, preload = false }: ApartmentCardProps
           sizes="(min-width: 1280px) 22vw, (min-width: 1024px) 30vw, (min-width: 640px) 45vw, 90vw"
           className="object-cover transition duration-300 group-hover:scale-105"
           preload={preload}
+          unoptimized={isExternalUrl(apartment.coverImageUrl ?? "")}
         />
       </div>
       <div className="space-y-1 p-4">

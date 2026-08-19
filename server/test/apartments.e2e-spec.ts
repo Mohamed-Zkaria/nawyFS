@@ -310,4 +310,258 @@ describe('Apartments (e2e)', () => {
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
   });
+
+  describe('PATCH /api/v1/apartments/:id', () => {
+    it('returns 401 for an unauthenticated request', async () => {
+      const project = await seedProject();
+      const apartment = await seedApartment(project);
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/apartments/${apartment.id}`)
+        .send({ bedrooms: 5 })
+        .expect(401);
+    });
+
+    it('returns 403 for an authenticated normal user', async () => {
+      const project = await seedProject();
+      const apartment = await seedApartment(project);
+      const token = await registerAndLogin(
+        app,
+        'patch-normal@example.com',
+        'CorrectHorse123',
+      );
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/apartments/${apartment.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ bedrooms: 5 })
+        .expect(403);
+    });
+
+    it('patches only the fields provided for an admin', async () => {
+      const project = await seedProject();
+      const apartment = await seedApartment(project, {
+        unitName: 'Original Name',
+        bedrooms: 2,
+      });
+      const token = await seedAdminAndLogin(
+        app,
+        dataSource,
+        'patch-admin@example.com',
+        'CorrectHorse123',
+      );
+
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/apartments/${apartment.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ bedrooms: 5 })
+        .expect(200);
+
+      expect(res.body.data.bedrooms).toBe(5);
+      expect(res.body.data.unitName).toBe('Original Name');
+    });
+
+    it('returns 404 for a missing apartment', async () => {
+      const token = await seedAdminAndLogin(
+        app,
+        dataSource,
+        'patch-admin2@example.com',
+        'CorrectHorse123',
+      );
+
+      const res = await request(app.getHttpServer())
+        .patch('/api/v1/apartments/00000000-0000-0000-0000-000000000000')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ bedrooms: 5 })
+        .expect(404);
+
+      expect(res.body.error.code).toBe('APARTMENT_NOT_FOUND');
+    });
+  });
+
+  describe('DELETE /api/v1/apartments/:id', () => {
+    it('returns 401 for an unauthenticated request', async () => {
+      const project = await seedProject();
+      const apartment = await seedApartment(project);
+
+      await request(app.getHttpServer())
+        .delete(`/api/v1/apartments/${apartment.id}`)
+        .expect(401);
+    });
+
+    it('returns 403 for an authenticated normal user', async () => {
+      const project = await seedProject();
+      const apartment = await seedApartment(project);
+      const token = await registerAndLogin(
+        app,
+        'delete-normal@example.com',
+        'CorrectHorse123',
+      );
+
+      await request(app.getHttpServer())
+        .delete(`/api/v1/apartments/${apartment.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+    });
+
+    it('soft-deletes for an admin, then 404s on subsequent reads', async () => {
+      const project = await seedProject();
+      const apartment = await seedApartment(project);
+      const token = await seedAdminAndLogin(
+        app,
+        dataSource,
+        'delete-admin@example.com',
+        'CorrectHorse123',
+      );
+
+      await request(app.getHttpServer())
+        .delete(`/api/v1/apartments/${apartment.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(204);
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/apartments/${apartment.id}`)
+        .expect(404);
+      expect(res.body.error.code).toBe('APARTMENT_NOT_FOUND');
+    });
+
+    it('returns 404 for a missing apartment', async () => {
+      const token = await seedAdminAndLogin(
+        app,
+        dataSource,
+        'delete-admin2@example.com',
+        'CorrectHorse123',
+      );
+
+      await request(app.getHttpServer())
+        .delete('/api/v1/apartments/00000000-0000-0000-0000-000000000000')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+    });
+  });
+
+  describe('apartment images', () => {
+    it('POST .../images returns 401 for an unauthenticated request', async () => {
+      const project = await seedProject();
+      const apartment = await seedApartment(project);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/apartments/${apartment.id}/images`)
+        .send({ urls: ['https://cdn.example.com/a.jpg'] })
+        .expect(401);
+    });
+
+    it('POST .../images returns 403 for an authenticated normal user', async () => {
+      const project = await seedProject();
+      const apartment = await seedApartment(project);
+      const token = await registerAndLogin(
+        app,
+        'images-normal@example.com',
+        'CorrectHorse123',
+      );
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/apartments/${apartment.id}/images`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ urls: ['https://cdn.example.com/a.jpg'] })
+        .expect(403);
+    });
+
+    it('POST .../images adds images in order for an admin', async () => {
+      const project = await seedProject();
+      const apartment = await seedApartment(project);
+      const token = await seedAdminAndLogin(
+        app,
+        dataSource,
+        'images-admin@example.com',
+        'CorrectHorse123',
+      );
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/apartments/${apartment.id}/images`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          urls: [
+            'https://cdn.example.com/a.jpg',
+            'https://cdn.example.com/b.jpg',
+          ],
+        })
+        .expect(201);
+
+      expect(res.body.data).toHaveLength(2);
+      expect(
+        res.body.data.map((image: { sortOrder: number }) => image.sortOrder),
+      ).toEqual([0, 1]);
+
+      const detail = await request(app.getHttpServer())
+        .get(`/api/v1/apartments/${apartment.id}`)
+        .expect(200);
+      expect(detail.body.data.coverImageUrl).toBe(
+        'https://cdn.example.com/a.jpg',
+      );
+    });
+
+    it('POST .../images returns 400 VALIDATION_ERROR for a non-URL string', async () => {
+      const project = await seedProject();
+      const apartment = await seedApartment(project);
+      const token = await seedAdminAndLogin(
+        app,
+        dataSource,
+        'images-admin2@example.com',
+        'CorrectHorse123',
+      );
+
+      const res = await request(app.getHttpServer())
+        .post(`/api/v1/apartments/${apartment.id}/images`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ urls: ['not-a-url'] })
+        .expect(400);
+
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('POST .../images returns 404 for a missing apartment', async () => {
+      const token = await seedAdminAndLogin(
+        app,
+        dataSource,
+        'images-admin3@example.com',
+        'CorrectHorse123',
+      );
+
+      await request(app.getHttpServer())
+        .post('/api/v1/apartments/00000000-0000-0000-0000-000000000000/images')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ urls: ['https://cdn.example.com/a.jpg'] })
+        .expect(404);
+    });
+
+    it('DELETE .../images/:imageId removes the image for an admin, then 404s', async () => {
+      const project = await seedProject();
+      const apartment = await seedApartment(project);
+      const token = await seedAdminAndLogin(
+        app,
+        dataSource,
+        'images-admin4@example.com',
+        'CorrectHorse123',
+      );
+
+      const created = await request(app.getHttpServer())
+        .post(`/api/v1/apartments/${apartment.id}/images`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ urls: ['https://cdn.example.com/a.jpg'] })
+        .expect(201);
+      const imageId = created.body.data[0].id;
+
+      await request(app.getHttpServer())
+        .delete(`/api/v1/apartments/${apartment.id}/images/${imageId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(204);
+
+      const res = await request(app.getHttpServer())
+        .delete(`/api/v1/apartments/${apartment.id}/images/${imageId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+      expect(res.body.error.code).toBe('IMAGE_NOT_FOUND');
+    });
+  });
 });

@@ -3,12 +3,18 @@ import { ApartmentRepositoryPort } from '@/modules/apartments/apartment.reposito
 import { ProjectRepositoryPort } from '@/modules/projects/project.repository.port';
 import { ApartmentMapper } from '@/modules/apartments/mappers/apartment.mapper';
 import { QueryApartmentsDto } from '@/modules/apartments/dto/query-apartments.dto';
-import { CreateApartmentDto } from '@/modules/apartments/dto/create-apartment.dto';
+import {
+  CreateApartmentDto,
+  UpdateApartmentDto,
+} from '@/modules/apartments/dto/create-apartment.dto';
+import { AddApartmentImagesDto } from '@/modules/apartments/dto/add-apartment-images.dto';
 import {
   ApartmentDetailDto,
+  ApartmentImageDto,
   ApartmentSummaryDto,
 } from '@/modules/apartments/dto/apartment-response.dto';
 import {
+  ApartmentImageNotFoundException,
   ApartmentNotFoundException,
   ProjectNotFoundException,
 } from '@/common/exceptions/domain.exceptions';
@@ -72,6 +78,71 @@ export class ApartmentsService {
 
     const full = await this.repo.findById(created.id);
     return this.mapper.toDetail(full!);
+  }
+
+  async update(
+    id: string,
+    dto: UpdateApartmentDto,
+  ): Promise<ApartmentDetailDto> {
+    const apartment = await this.repo.findById(id);
+    if (!apartment) throw new ApartmentNotFoundException(id);
+
+    let projectId: string | undefined;
+    if (dto.projectId) {
+      await this.requireProject(dto.projectId);
+      projectId = dto.projectId;
+    } else if (dto.projectName) {
+      const project = await this.findOrCreateProject(
+        dto.projectName,
+        dto.projectCity!,
+      );
+      projectId = project.id;
+    }
+
+    await this.repo.update(apartment, {
+      unitName: dto.unitName,
+      unitNumber: dto.unitNumber,
+      projectId,
+      description: dto.description,
+      price: dto.price?.toFixed(2),
+      bedrooms: dto.bedrooms,
+      bathrooms: dto.bathrooms,
+      areaSqm: dto.areaSqm?.toFixed(2),
+    });
+
+    const full = await this.repo.findById(id);
+    return this.mapper.toDetail(full!);
+  }
+
+  async remove(id: string): Promise<void> {
+    const apartment = await this.repo.findById(id);
+    if (!apartment) throw new ApartmentNotFoundException(id);
+    await this.repo.softRemove(apartment);
+  }
+
+  async addImages(
+    id: string,
+    dto: AddApartmentImagesDto,
+  ): Promise<ApartmentImageDto[]> {
+    const apartment = await this.repo.findById(id);
+    if (!apartment) throw new ApartmentNotFoundException(id);
+
+    const startOrder = apartment.images.length
+      ? Math.max(...apartment.images.map((image) => image.sortOrder)) + 1
+      : 0;
+
+    const created = await this.repo.addImages(
+      id,
+      dto.urls.map((url, index) => ({ url, sortOrder: startOrder + index })),
+    );
+
+    return created.map((image) => this.mapper.toImage(image));
+  }
+
+  async removeImage(apartmentId: string, imageId: string): Promise<void> {
+    const image = await this.repo.findImage(apartmentId, imageId);
+    if (!image) throw new ApartmentImageNotFoundException(imageId);
+    await this.repo.removeImage(image);
   }
 
   private async requireProject(id: string): Promise<Project> {

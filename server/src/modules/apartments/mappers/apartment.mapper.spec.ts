@@ -1,5 +1,4 @@
 import { ApartmentMapper } from '@/modules/apartments/mappers/apartment.mapper';
-import { AppConfigService } from '@/config/app-config.service';
 import { ApartmentImage } from '@/modules/apartments/entities/apartment-image.entity';
 import {
   createProject,
@@ -9,12 +8,6 @@ import {
   createApartment,
   resetApartmentFactory,
 } from '@/modules/apartments/test/apartment.factory';
-
-function createMapper(publicPath = '/uploads'): ApartmentMapper {
-  return new ApartmentMapper({
-    uploads: { publicPath },
-  } as unknown as AppConfigService);
-}
 
 function createImage(overrides: Partial<ApartmentImage>): ApartmentImage {
   return Object.assign(new ApartmentImage(), overrides);
@@ -26,20 +19,28 @@ describe('ApartmentMapper', () => {
     resetApartmentFactory();
   });
 
-  it('composes image URLs from config and picks the lowest sort_order as cover', () => {
+  it('picks the lowest sort_order as cover and preserves each image URL as-is', () => {
     const project = createProject();
     const images = [
-      createImage({ id: 'img-2', storageKey: 'b.jpg', sortOrder: 2 }),
-      createImage({ id: 'img-1', storageKey: 'a.jpg', sortOrder: 1 }),
+      createImage({
+        id: 'img-2',
+        url: 'https://cdn.example.com/b.jpg',
+        sortOrder: 2,
+      }),
+      createImage({
+        id: 'img-1',
+        url: 'https://cdn.example.com/a.jpg',
+        sortOrder: 1,
+      }),
     ];
     const apartment = createApartment(project, { images });
 
-    const detail = createMapper('/files').toDetail(apartment);
+    const detail = new ApartmentMapper().toDetail(apartment);
 
-    expect(detail.coverImageUrl).toBe('/files/a.jpg');
+    expect(detail.coverImageUrl).toBe('https://cdn.example.com/a.jpg');
     expect(detail.images.map((image) => image.url)).toEqual([
-      '/files/a.jpg',
-      '/files/b.jpg',
+      'https://cdn.example.com/a.jpg',
+      'https://cdn.example.com/b.jpg',
     ]);
   });
 
@@ -47,7 +48,7 @@ describe('ApartmentMapper', () => {
     const project = createProject();
     const apartment = createApartment(project, { images: [] });
 
-    const summary = createMapper().toSummary(apartment);
+    const summary = new ApartmentMapper().toSummary(apartment);
 
     expect(summary.coverImageUrl).toBeNull();
     expect(summary).not.toHaveProperty('project');

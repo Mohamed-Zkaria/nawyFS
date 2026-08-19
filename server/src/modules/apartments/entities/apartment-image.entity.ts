@@ -22,17 +22,10 @@ export class ApartmentImage {
   @JoinColumn({ name: 'apartment_id' })
   apartment!: Apartment;
 
-  @Column({ name: 'storage_key', type: 'varchar', length: 255 })
-  storageKey!: string;
-
-  @Column({ name: 'original_name', type: 'varchar', length: 255 })
-  originalName!: string;
-
-  @Column({ name: 'mime_type', type: 'varchar', length: 100 })
-  mimeType!: string;
-
-  @Column({ name: 'size_bytes', type: 'integer' })
-  sizeBytes!: number;
+  // An admin-supplied external URL — there is no upload pipeline in this
+  // project, so this is never a locally-composed path.
+  @Column({ type: 'varchar', length: 2048 })
+  url!: string;
 
   @Column({ name: 'sort_order', type: 'smallint', default: 0 })
   sortOrder!: number;

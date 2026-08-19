@@ -50,5 +50,8 @@ export async function apiFetch<T>(
     );
   }
 
+  // 204 No Content (DELETE endpoints) has no body to parse.
+  if (res.status === 204) return { data: undefined as T };
+
   return (await res.json()) as Envelope<T>;
 }

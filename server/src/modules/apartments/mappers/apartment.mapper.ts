@@ -1,16 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { AppConfigService } from '@/config/app-config.service';
 import { Apartment } from '@/modules/apartments/entities/apartment.entity';
 import { ApartmentImage } from '@/modules/apartments/entities/apartment-image.entity';
 import {
   ApartmentDetailDto,
+  ApartmentImageDto,
   ApartmentSummaryDto,
 } from '@/modules/apartments/dto/apartment-response.dto';
 
 @Injectable()
 export class ApartmentMapper {
-  constructor(private readonly cfg: AppConfigService) {}
-
   toSummary(apartment: Apartment): ApartmentSummaryDto {
     return {
       id: apartment.id,
@@ -32,12 +30,12 @@ export class ApartmentMapper {
       ...this.toSummary(apartment),
       description: apartment.description,
       updatedAt: apartment.updatedAt.toISOString(),
-      images: this.sortedImages(apartment).map((image) => ({
-        id: image.id,
-        url: this.imageUrl(image.storageKey),
-        sortOrder: image.sortOrder,
-      })),
+      images: this.sortedImages(apartment).map((image) => this.toImage(image)),
     };
+  }
+
+  toImage(image: ApartmentImage): ApartmentImageDto {
+    return { id: image.id, url: image.url, sortOrder: image.sortOrder };
   }
 
   private sortedImages(apartment: Apartment): ApartmentImage[] {
@@ -48,12 +46,6 @@ export class ApartmentMapper {
 
   private coverImageUrl(apartment: Apartment): string | null {
     const [cover] = this.sortedImages(apartment);
-    return cover ? this.imageUrl(cover.storageKey) : null;
-  }
-
-  // Relative, host-agnostic path composed from config — never an absolute
-  // URL, so the same DB dump works in dev, docker, and any future deploy.
-  private imageUrl(storageKey: string): string {
-    return `${this.cfg.uploads.publicPath}/${storageKey}`;
+    return cover ? cover.url : null;
   }
 }

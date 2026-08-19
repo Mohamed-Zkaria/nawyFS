@@ -23,12 +23,6 @@ RUN npm ci --omit=dev
 FROM base AS runner
 ENV NODE_ENV=production
 
-# A fresh named volume mounted at /app/uploads inherits root ownership from
-# the image directory at creation time, not from the `node` user switched to
-# below — creating and chowning it here (before USER node) is what stops
-# every future upload write from failing with EACCES.
-RUN mkdir -p /app/uploads && chown -R node:node /app
-
 USER node
 
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules

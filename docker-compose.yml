@@ -57,8 +57,6 @@ services:
       - ./server/.env.docker
     ports:
       - "${API_PORT:-4000}:4000"
-    volumes:
-      - uploads:/app/uploads
     init: true
     stop_grace_period: 15s
     depends_on:
@@ -81,4 +79,3 @@ services:
 
 volumes:
   pgdata:
-  uploads:

@@ -2,13 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Apartment } from '@/modules/apartments/entities/apartment.entity';
+import { ApartmentImage } from '@/modules/apartments/entities/apartment-image.entity';
 import {
   ApartmentFilter,
   ApartmentRepositoryPort,
   CreateApartmentData,
+  NewApartmentImageData,
+  UpdateApartmentData,
 } from '@/modules/apartments/apartment.repository.port';
 import { ApartmentSortBy } from '@/modules/apartments/dto/query-apartments.dto';
 import { escapeLike } from '@/common/utils/escape-like';
+import { withoutUndefined } from '@/common/utils/without-undefined';
 
 const SORT_COLUMN: Record<ApartmentSortBy, string> = {
   [ApartmentSortBy.CREATED_AT]: 'apartment.createdAt',
@@ -21,6 +25,8 @@ export class TypeOrmApartmentRepository implements ApartmentRepositoryPort {
   constructor(
     @InjectRepository(Apartment)
     private readonly repo: Repository<Apartment>,
+    @InjectRepository(ApartmentImage)
+    private readonly imageRepo: Repository<ApartmentImage>,
   ) {}
 
   async findPaginated(filter: ApartmentFilter): Promise<[Apartment[], number]> {
@@ -80,5 +86,35 @@ export class TypeOrmApartmentRepository implements ApartmentRepositoryPort {
 
   save(data: CreateApartmentData): Promise<Apartment> {
     return this.repo.save(this.repo.create(data));
+  }
+
+  update(apartment: Apartment, data: UpdateApartmentData): Promise<Apartment> {
+    Object.assign(apartment, withoutUndefined(data));
+    return this.repo.save(apartment);
+  }
+
+  async softRemove(apartment: Apartment): Promise<void> {
+    await this.repo.softRemove(apartment);
+  }
+
+  addImages(
+    apartmentId: string,
+    images: NewApartmentImageData[],
+  ): Promise<ApartmentImage[]> {
+    const entities = images.map((image) =>
+      this.imageRepo.create({ apartmentId, ...image }),
+    );
+    return this.imageRepo.save(entities);
+  }
+
+  findImage(
+    apartmentId: string,
+    imageId: string,
+  ): Promise<ApartmentImage | null> {
+    return this.imageRepo.findOne({ where: { id: imageId, apartmentId } });
+  }
+
+  async removeImage(image: ApartmentImage): Promise<void> {
+    await this.imageRepo.remove(image);
   }
 }

@@ -1,16 +1,22 @@
 import { Apartment } from '@/modules/apartments/entities/apartment.entity';
+import { ApartmentImage } from '@/modules/apartments/entities/apartment-image.entity';
 import {
   ApartmentFilter,
   ApartmentRepositoryPort,
   CreateApartmentData,
+  NewApartmentImageData,
+  UpdateApartmentData,
 } from '@/modules/apartments/apartment.repository.port';
 import { ApartmentSortBy } from '@/modules/apartments/dto/query-apartments.dto';
+import { withoutUndefined } from '@/common/utils/without-undefined';
 
 // Test double proving ApartmentRepositoryPort's LSP contract: this and
 // TypeOrmApartmentRepository are interchangeable behind the same port, so
 // ApartmentsService can be unit-tested with zero database.
 export class InMemoryApartmentRepository implements ApartmentRepositoryPort {
   private apartments: Apartment[] = [];
+  private images: ApartmentImage[] = [];
+  private imageCounter = 0;
 
   seed(apartments: Apartment[]): void {
     this.apartments = apartments;
@@ -78,5 +84,57 @@ export class InMemoryApartmentRepository implements ApartmentRepositoryPort {
     apartment.images = [];
     this.apartments.push(apartment);
     return Promise.resolve(apartment);
+  }
+
+  update(apartment: Apartment, data: UpdateApartmentData): Promise<Apartment> {
+    Object.assign(apartment, withoutUndefined(data));
+    apartment.updatedAt = new Date();
+    return Promise.resolve(apartment);
+  }
+
+  softRemove(apartment: Apartment): Promise<void> {
+    apartment.deletedAt = new Date();
+    return Promise.resolve();
+  }
+
+  addImages(
+    apartmentId: string,
+    images: NewApartmentImageData[],
+  ): Promise<ApartmentImage[]> {
+    const created = images.map((image) => {
+      this.imageCounter += 1;
+      return Object.assign(new ApartmentImage(), {
+        id: `image-${this.imageCounter}`,
+        apartmentId,
+        url: image.url,
+        sortOrder: image.sortOrder,
+        createdAt: new Date(),
+      });
+    });
+
+    this.images.push(...created);
+    const apartment = this.apartments.find((a) => a.id === apartmentId);
+    if (apartment) apartment.images = [...apartment.images, ...created];
+
+    return Promise.resolve(created);
+  }
+
+  findImage(
+    apartmentId: string,
+    imageId: string,
+  ): Promise<ApartmentImage | null> {
+    const found = this.images.find(
+      (image) => image.id === imageId && image.apartmentId === apartmentId,
+    );
+    return Promise.resolve(found ?? null);
+  }
+
+  removeImage(image: ApartmentImage): Promise<void> {
+    this.images = this.images.filter((i) => i.id !== image.id);
+    const apartment = this.apartments.find((a) => a.id === image.apartmentId);
+    if (apartment) {
+      apartment.images = apartment.images.filter((i) => i.id !== image.id);
+    }
+    return Promise.resolve();
   }
 }

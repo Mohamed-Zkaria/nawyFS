@@ -6,10 +6,10 @@ import { ApartmentSortBy } from '@/modules/apartments/dto/query-apartments.dto';
 import { QueryApartmentsDto } from '@/modules/apartments/dto/query-apartments.dto';
 import { CreateApartmentDto } from '@/modules/apartments/dto/create-apartment.dto';
 import {
+  ApartmentImageNotFoundException,
   ApartmentNotFoundException,
   ProjectNotFoundException,
 } from '@/common/exceptions/domain.exceptions';
-import { AppConfigService } from '@/config/app-config.service';
 import {
   createProject,
   resetProjectFactory,
@@ -18,12 +18,6 @@ import {
   createApartment,
   resetApartmentFactory,
 } from '@/modules/apartments/test/apartment.factory';
-
-function createMapper(): ApartmentMapper {
-  return new ApartmentMapper({
-    uploads: { publicPath: '/uploads' },
-  } as unknown as AppConfigService);
-}
 
 function query(
   overrides: Partial<QueryApartmentsDto> = {},
@@ -59,7 +53,7 @@ describe('ApartmentsService', () => {
     resetApartmentFactory();
     repo = new InMemoryApartmentRepository();
     projectRepo = new InMemoryProjectRepository();
-    service = new ApartmentsService(repo, projectRepo, createMapper());
+    service = new ApartmentsService(repo, projectRepo, new ApartmentMapper());
   });
 
   it('paginates results and reports correct meta', async () => {
@@ -166,6 +160,145 @@ describe('ApartmentsService', () => {
 
       const projects = await projectRepo.findAll();
       expect(projects).toHaveLength(1);
+    });
+  });
+
+  describe('update', () => {
+    it('patches only the fields provided, leaving the rest untouched', async () => {
+      const project = createProject();
+      const apartment = createApartment(project, {
+        unitName: 'Original Name',
+        bedrooms: 2,
+      });
+      repo.seed([apartment]);
+
+      const detail = await service.update(apartment.id, { bedrooms: 4 });
+
+      expect(detail.bedrooms).toBe(4);
+      expect(detail.unitName).toBe('Original Name');
+    });
+
+    it('throws ApartmentNotFoundException for a missing id', async () => {
+      await expect(
+        service.update('missing-id', { bedrooms: 3 }),
+      ).rejects.toBeInstanceOf(ApartmentNotFoundException);
+    });
+
+    it('moves the apartment to a different existing project by projectId', async () => {
+      const projectA = createProject({ name: 'Project A' });
+      const projectB = createProject({ name: 'Project B' });
+      projectRepo.seed([projectA, projectB]);
+      const apartment = createApartment(projectA);
+      repo.seed([apartment]);
+
+      const detail = await service.update(apartment.id, {
+        projectId: projectB.id,
+      });
+
+      expect(detail.projectId).toBe(projectB.id);
+    });
+
+    it('throws ProjectNotFoundException for an unknown projectId', async () => {
+      const project = createProject();
+      const apartment = createApartment(project);
+      repo.seed([apartment]);
+
+      await expect(
+        service.update(apartment.id, { projectId: 'missing-project' }),
+      ).rejects.toBeInstanceOf(ProjectNotFoundException);
+    });
+  });
+
+  describe('remove', () => {
+    it('soft-deletes so the apartment no longer resolves', async () => {
+      const project = createProject();
+      const apartment = createApartment(project);
+      repo.seed([apartment]);
+
+      await service.remove(apartment.id);
+
+      await expect(service.findById(apartment.id)).rejects.toBeInstanceOf(
+        ApartmentNotFoundException,
+      );
+    });
+
+    it('throws ApartmentNotFoundException for a missing id', async () => {
+      await expect(service.remove('missing-id')).rejects.toBeInstanceOf(
+        ApartmentNotFoundException,
+      );
+    });
+  });
+
+  describe('images', () => {
+    it('adds images in order, appending after any existing sort_order', async () => {
+      const project = createProject();
+      const apartment = createApartment(project);
+      repo.seed([apartment]);
+
+      const first = await service.addImages(apartment.id, {
+        urls: ['https://cdn.example.com/a.jpg'],
+      });
+      expect(first).toEqual([
+        {
+          id: expect.any(String),
+          url: 'https://cdn.example.com/a.jpg',
+          sortOrder: 0,
+        },
+      ]);
+
+      const second = await service.addImages(apartment.id, {
+        urls: [
+          'https://cdn.example.com/b.jpg',
+          'https://cdn.example.com/c.jpg',
+        ],
+      });
+      expect(second.map((image) => image.sortOrder)).toEqual([1, 2]);
+    });
+
+    it('throws ApartmentNotFoundException when adding images to a missing apartment', async () => {
+      await expect(
+        service.addImages('missing-id', {
+          urls: ['https://cdn.example.com/a.jpg'],
+        }),
+      ).rejects.toBeInstanceOf(ApartmentNotFoundException);
+    });
+
+    it('removes an image scoped to its apartment', async () => {
+      const project = createProject();
+      const apartment = createApartment(project);
+      repo.seed([apartment]);
+      const [image] = await service.addImages(apartment.id, {
+        urls: ['https://cdn.example.com/a.jpg'],
+      });
+
+      await service.removeImage(apartment.id, image.id);
+
+      const detail = await service.findById(apartment.id);
+      expect(detail.images).toHaveLength(0);
+    });
+
+    it('throws ApartmentImageNotFoundException for an unknown image id', async () => {
+      const project = createProject();
+      const apartment = createApartment(project);
+      repo.seed([apartment]);
+
+      await expect(
+        service.removeImage(apartment.id, 'missing-image'),
+      ).rejects.toBeInstanceOf(ApartmentImageNotFoundException);
+    });
+
+    it('throws ApartmentImageNotFoundException when the image belongs to a different apartment', async () => {
+      const project = createProject();
+      const apartmentA = createApartment(project);
+      const apartmentB = createApartment(project);
+      repo.seed([apartmentA, apartmentB]);
+      const [image] = await service.addImages(apartmentA.id, {
+        urls: ['https://cdn.example.com/a.jpg'],
+      });
+
+      await expect(
+        service.removeImage(apartmentB.id, image.id),
+      ).rejects.toBeInstanceOf(ApartmentImageNotFoundException);
     });
   });
 });

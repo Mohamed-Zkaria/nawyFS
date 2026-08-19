@@ -1,3 +1,4 @@
+import { PartialType } from '@nestjs/swagger';
 import {
   IsInt,
   IsNumber,
@@ -65,3 +66,9 @@ export class CreateApartmentDto {
   @Min(0.01)
   areaSqm!: number;
 }
+
+// PartialType adds @IsOptional() to every inherited property, so a PATCH
+// payload touching only one field validates correctly — and, crucially,
+// so does omitting both projectId and projectName (the @ValidateIf pair
+// above only ever runs when the value is actually present).
+export class UpdateApartmentDto extends PartialType(CreateApartmentDto) {}
