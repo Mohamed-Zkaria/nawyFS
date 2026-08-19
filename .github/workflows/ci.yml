@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    name: Server (lint, build, unit test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: server/.nvmrc
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  server-e2e:
+    name: Server (e2e, testcontainers)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: server/.nvmrc
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - run: npm ci
+      - run: npm run test:e2e
+
+  client:
+    name: Client (lint, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  docker-smoke:
+    name: Docker compose smoke test
+    runs-on: ubuntu-latest
+    needs: [server, server-e2e, client]
+    steps:
+      - uses: actions/checkout@v4
+
+      # No env vars or .env file set here on purpose: this proves the
+      # committed server/.env.docker and every ${VAR:-default} in
+      # docker-compose.yml are enough on a genuinely fresh checkout —
+      # the "one command, zero setup" property the task requires.
+      - name: Start the stack
+        run: docker compose up --build -d --wait --wait-timeout 180
+
+      - name: Smoke-test the running stack
+        run: |
+          curl -f http://localhost:4000/health
+          curl -f http://localhost:4000/api/v1/apartments
+          curl -f http://localhost:3000/
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

@@ -232,6 +232,13 @@ full apartment CRUD including the 409 duplicate-unit conflict, the
 `login 429` case, and image add/remove — all against a real Postgres
 instance, not mocks.
 
+**CI** (`.github/workflows/ci.yml`) runs all of the above automatically on
+every push/PR to `main`: server lint/build/unit tests, server e2e against a
+real testcontainers Postgres, client lint/build, then a `docker compose up
+--build` smoke test (no env vars set, to prove the committed defaults are
+enough on a fresh checkout) that curls `/health`, `/api/v1/apartments`, and
+the web root before tearing the stack down.
+
 ## What's next
 
 Roughly in priority order if this continued past the take-home:
@@ -242,9 +249,6 @@ Roughly in priority order if this continued past the take-home:
 - **Client test suite** (Vitest + Testing Library) for the pure functions
   (`search-params.ts` parsing, `format.ts`) and the interactive client
   components — none exist yet.
-- **CI** (GitHub Actions: server lint/unit/e2e → client lint/build →
-  `docker compose build`) — everything it would run already works locally,
-  it just isn't automated yet.
 - **Keyset/cursor pagination** — offset pagination is fine at this scale
   and is what's shipped; documented as the scale answer, not built.
 - **`openapi-typescript`-generated client types** — right now the client's
