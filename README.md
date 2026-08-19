@@ -7,8 +7,8 @@ runnable with one command.
 ## Quickstart
 
 ```bash
-git clone <this repo>
-cd task
+git clone 
+cd nawyFS
 docker compose up --build
 ```
 
