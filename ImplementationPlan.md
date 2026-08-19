@@ -34,20 +34,33 @@
   storage module, no rate limiting, no client-side login UI. 32 unit tests passing (incl. `auth.service.spec.ts`,
   `roles.guard.spec.ts`), build clean, lint clean.
 
+**Done since (this session):**
+1. **e2e tests for the new auth/create endpoints** — added `test/auth.e2e-spec.ts` (register 201/409/400,
+   login 200/401-same-body, `/auth/me` 200/401) and `POST /apartments` cases in `test/apartments.e2e-spec.ts`
+   (401 unauthenticated → 403 normal-user → 201 admin → 409 duplicate unit → 201 auto-created project by
+   name → 400 neither projectId/projectName). Ran `npm run test:e2e` for real against testcontainers —
+   **28/28 passing.** `npm test` (unit) 32/32, `npm run build` and `npm run lint` clean.
+2. **Two real bugs found and fixed while getting the e2e run green** (not test-content issues — see
+   context.md for the full root-cause writeup):
+   - `test/setup/test-app.ts` statically imported `AppModule`, which transitively evaluates
+     `ConfigModule.forRoot()` at *import* time (before `applyTestDbEnv()` ever ran), so every e2e run was
+     silently validating against the default `DB_PORT=5432` instead of the testcontainers port. Fixed by
+     switching to a dynamic `await import(...)` inside `createTestApp()`, after `applyTestDbEnv()`.
+   - Adding the global `JwtAuthGuard` (secure-by-default) during the auth work never got `@Public()` added
+     to the pre-existing public read routes it now covers — `GET /health`, `GET /projects`,
+     `GET /apartments`, `GET /apartments/:id` were all silently 401ing. Fixed by adding `@Public()` to all
+     four handlers.
+3. **Live manual verification** of the new endpoints (temp Postgres + seed + curl/Swagger) — still not done;
+   the e2e suite exercises the same paths but a from-scratch manual pass hasn't happened.
+
 **Not yet done — pick up here:**
-1. **e2e tests for the new auth/create endpoints** — `test/setup/auth-helpers.ts` (`registerAndLogin`,
-   `seedAdminAndLogin`) already exists for this; still need `test/auth.e2e-spec.ts` (register 201/409,
-   login 200/401-same-body, `/auth/me` 200/401) and `POST /apartments` cases added to
-   `test/apartments.e2e-spec.ts` (401 unauthenticated → 403 normal-user → 201 admin → 409 duplicate unit →
-   201 auto-created project by name). Then run `npm run test:e2e` for real (testcontainers) — this was not
-   run in the last session due to hitting a usage checkpoint.
-2. **Live manual verification** of the new endpoints (temp Postgres + seed + curl/Swagger: log in as the
-   seeded admin, create an apartment, confirm it shows up in `GET /apartments`) — also not done yet.
-3. **Phase 3 — Docker one-command** (next MUST-priority phase per §13 below) — not started. No `Dockerfile`
+1. **Live manual verification** (see above) — optional at this point given e2e coverage, but still on the
+   original list.
+2. **Phase 3 — Docker one-command** (next MUST-priority phase per §13 below) — not started. No `Dockerfile`
    in either project, no `docker-compose.yml`.
-4. **Rest of Phase 4** — `PATCH`/`DELETE` apartments, image upload + `StorageService` + static serving +
+3. **Rest of Phase 4** — `PATCH`/`DELETE` apartments, image upload + `StorageService` + static serving +
    the `/uploads` route handler, client login page + session cookie handler + `/admin/*` pages. Not started.
-5. **Phases 5–7** (hardening, coverage/docs, polish) — not started.
+4. **Phases 5–7** (hardening, coverage/docs, polish) — not started.
 
 Stop-after-each-phase is a standing instruction from the user — do not chain multiple phases in one
 uninterrupted run; report and wait after finishing each one.

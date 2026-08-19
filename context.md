@@ -9,10 +9,11 @@
 Tell the next session: *"Read ImplementationPlan.md's Status section and context.md, then continue."*
 Everything is committed to git on `main` (nothing pushed to `origin`). No background processes are
 running — any dev server / Docker container from a previous session was stopped before ending it.
+(Docker Desktop itself was left running at the end of this session — it wasn't started as a per-task temp
+resource and Phase 3 needs it next anyway.)
 
-Immediate next step (see ImplementationPlan.md Status item 1): write `test/auth.e2e-spec.ts` and extend
-`test/apartments.e2e-spec.ts` with `POST /apartments` cases, then actually run `npm run test:e2e`
-(testcontainers — needs Docker running). This was written but never executed before the session ended.
+Immediate next step (see ImplementationPlan.md Status): Phase 3 — Docker one-command. The e2e-test item is
+now done (see below); the auth/create endpoints are verified.
 
 ## User working style — apply these without being asked again
 
@@ -81,6 +82,32 @@ Immediate next step (see ImplementationPlan.md Status item 1): write `test/auth.
   environment — screenshots came back at the original window size regardless of the requested dimensions.
   Mobile-breakpoint rendering is therefore *unverified by screenshot*, though the grid uses the plan's
   exact standard Tailwind classes (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`).
+- **`@nestjs/config`'s `ConfigModule.forRoot()` reads `process.env` synchronously the moment it's *called*,
+  not when Nest later instantiates the module.** Because it's invoked as a plain function inside
+  `ConfigModule`'s (the project's own config module) `@Module({ imports: [...] })` decorator, that call
+  happens at *import time* of `config.module.ts` — i.e. whenever something first `import`s a chain leading
+  to it. `test/setup/test-app.ts` statically imported `AppModule` at the top of the file (hoisted, so it
+  runs before any code in the file's functions), which meant `ConfigModule.forRoot()` — and therefore
+  `env.validation.ts`'s `validateEnv()` — ran and captured `process.env` *before* `applyTestDbEnv()` ever
+  executed. Every e2e run was silently validating against the default `DB_HOST=localhost`/`DB_PORT=5432`
+  instead of the testcontainers container's actual mapped port, so `TypeOrmModule` retried against a port
+  nothing was listening on and every suite failed with an unhelpful bare `AggregateError` (no message) —
+  looked exactly like a Docker/networking problem, and cost real time to rule that out (confirmed raw
+  `net.connect` to the actual container port succeeded fine; the app just wasn't using that port). **Fixed**
+  by replacing the static `AppModule`/`configureApp` imports in `test-app.ts` with `await import(...)`
+  performed *inside* `createTestApp()`, after `applyTestDbEnv()` — dynamic import is a real async operation
+  that yields to the microtask queue, so the synchronous `applyTestDbEnv()` call has already completed by
+  the time the module (and therefore `ConfigModule.forRoot()`) actually evaluates. **Same trap applies to
+  any future test helper that imports `AppModule` (or anything importing `ConfigModule`) statically before
+  test-specific env vars are set** — always defer with a dynamic import instead.
+- **Adding the global `JwtAuthGuard` during the auth work never got `@Public()` back-filled onto the
+  pre-existing public read routes it now covers.** `GET /health`, `GET /projects`, `GET /apartments`, and
+  `GET /apartments/:id` were all silently 401ing — invisible without an actual e2e run, which is exactly
+  why this wasn't caught until this session. `RolesGuard`/`JwtAuthGuard` are secure-by-default (correct
+  design per §7 of the plan), but that means every *new* public route — and every route that existed before
+  the guard went global — needs the decorator explicitly. Fixed by adding `@Public()` to all four handlers.
+  **Checklist for any future public endpoint**: if a controller method has no `@Roles()`, it needs
+  `@Public()`, full stop — there is no third state.
 
 ## Conventions established (follow these for anything new)
 

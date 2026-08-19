@@ -2,8 +2,6 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { AppModule } from '../../src/app.module';
-import { configureApp } from '../../src/bootstrap';
 
 const STATE_FILE = join(__dirname, '.testcontainers.json');
 
@@ -27,12 +25,20 @@ function applyTestDbEnv(): void {
   process.env.DB_NAME = connection.database;
 }
 
-// @Module() decorators only register metadata at import time — env vars
-// are read later, when Test.createTestingModule(...).compile() actually
-// instantiates ConfigModule/DatabaseModule. So it's safe to apply the
-// container's connection details here, right before compiling.
+// @nestjs/config's ConfigModule.forRoot() reads process.env synchronously
+// the moment it's *called* — which, for a plain function invocation inside
+// a @Module() decorator's `imports` array, happens at import time of
+// config.module.ts, not at Test.createTestingModule().compile() time. So
+// AppModule (and everything importing ConfigModule transitively) must be
+// imported dynamically — not statically — after applyTestDbEnv() has set
+// process.env, or DatabaseModule silently validates against the default
+// (pre-testcontainers) DB_HOST/DB_PORT. A static `import` is hoisted and
+// would run before applyTestDbEnv() ever executes.
 export async function createTestApp(): Promise<INestApplication> {
   applyTestDbEnv();
+
+  const { AppModule } = await import('../../src/app.module');
+  const { configureApp } = await import('../../src/bootstrap');
 
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],

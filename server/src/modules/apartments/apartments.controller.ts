@@ -16,6 +16,7 @@ import {
   ApartmentSummaryDto,
 } from '@/modules/apartments/dto/apartment-response.dto';
 import { PaginatedEnvelope } from '@/common/interfaces/pagination.interface';
+import { Public } from '@/modules/auth/decorators/public.decorator';
 import { Roles } from '@/modules/auth/decorators/roles.decorator';
 import { UserRole } from '@/modules/users/entities/user-role.enum';
 
@@ -24,6 +25,7 @@ import { UserRole } from '@/modules/users/entities/user-role.enum';
 export class ApartmentsController {
   constructor(private readonly apartmentsService: ApartmentsService) {}
 
+  @Public()
   @Get()
   findAll(
     @Query() query: QueryApartmentsDto,
@@ -31,6 +33,7 @@ export class ApartmentsController {
     return this.apartmentsService.findPaginated(query);
   }
 
+  @Public()
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string): Promise<ApartmentDetailDto> {
     return this.apartmentsService.findById(id);
