@@ -6,6 +6,54 @@
 
 ---
 
+## Status (updated by Claude at end of last session — resume point)
+
+**Done and committed** (git log, oldest first): `9409733` design docs · `3f8cae6` Phase 0 · `4ef4038` Phase 1 ·
+`0391306` Phase 2 · `da486d4` auth + admin create (see below). Nothing pushed to `origin` yet.
+
+- **Phase 0 — Foundation**: done as designed. One addition beyond plan text: `eslint.config.js` (flat config)
+  replaces the scaffold's incompatible `.eslintrc.js`; `esModuleInterop: true` added to `tsconfig.json`
+  (needed once `test/` files use default imports like `import request from 'supertest'`).
+- **Phase 1 — Data + read APIs**: done. `GET /apartments` (pagination/search/filter/sort), `GET /apartments/:id`,
+  `GET /projects`, envelope interceptor, exception filter, Swagger at `/api/docs`. **Deviation**: env schema and
+  `.env.example` are built *incrementally* per-phase (only vars a phase actually consumes), not fully upfront as
+  §10's example implies — a deliberate call confirmed with the user, not an oversight. 16 unit + 11 e2e tests,
+  all passing against a real Postgres via testcontainers.
+- **Phase 2 — Frontend listing + detail**: done. Listing page (debounced URL search, project filter, sort,
+  pagination), detail page + gallery, loading/error/not-found, responsive grid. **Deviation**: no same-origin
+  proxy route, no `/uploads` route handler, no runtime-config provider yet — nothing in this phase makes a
+  client-side call to the API (search is a server re-render via URL change), so these have no caller. Deferred
+  to whenever Phase 4's admin forms / real uploads need them.
+- **Auth + admin "create" (done ahead of sequence, at the user's explicit request)**: `users` table + migration,
+  JWT auth module (`POST /auth/register`, `POST /auth/login`, `GET /auth/me`), global `JwtAuthGuard` +
+  `RolesGuard` with `@Public()`/`@Roles()`, `bcryptjs` behind a `PasswordHasher` port, idempotent seeded admin
+  from `ADMIN_EMAIL`/`ADMIN_PASSWORD`. **Admin-only `POST /api/v1/apartments`**: exactly one of `projectId` or
+  `projectName`+`projectCity` (auto-creates the project if named and not found); PG `23505` on
+  `uq_apartments_project_unit` now maps to `409 UNIT_ALREADY_EXISTS` in the exception filter.
+  **Scoped narrowly on purpose**: this is a subset of Phase 4 below — no `PATCH`/`DELETE`, no image upload/
+  storage module, no rate limiting, no client-side login UI. 32 unit tests passing (incl. `auth.service.spec.ts`,
+  `roles.guard.spec.ts`), build clean, lint clean.
+
+**Not yet done — pick up here:**
+1. **e2e tests for the new auth/create endpoints** — `test/setup/auth-helpers.ts` (`registerAndLogin`,
+   `seedAdminAndLogin`) already exists for this; still need `test/auth.e2e-spec.ts` (register 201/409,
+   login 200/401-same-body, `/auth/me` 200/401) and `POST /apartments` cases added to
+   `test/apartments.e2e-spec.ts` (401 unauthenticated → 403 normal-user → 201 admin → 409 duplicate unit →
+   201 auto-created project by name). Then run `npm run test:e2e` for real (testcontainers) — this was not
+   run in the last session due to hitting a usage checkpoint.
+2. **Live manual verification** of the new endpoints (temp Postgres + seed + curl/Swagger: log in as the
+   seeded admin, create an apartment, confirm it shows up in `GET /apartments`) — also not done yet.
+3. **Phase 3 — Docker one-command** (next MUST-priority phase per §13 below) — not started. No `Dockerfile`
+   in either project, no `docker-compose.yml`.
+4. **Rest of Phase 4** — `PATCH`/`DELETE` apartments, image upload + `StorageService` + static serving +
+   the `/uploads` route handler, client login page + session cookie handler + `/admin/*` pages. Not started.
+5. **Phases 5–7** (hardening, coverage/docs, polish) — not started.
+
+Stop-after-each-phase is a standing instruction from the user — do not chain multiple phases in one
+uninterrupted run; report and wait after finishing each one.
+
+---
+
 ## 1. Context
 
 Build an apartment listing app: a TypeScript API (list, detail, create), a responsive Next.js frontend
