@@ -4,6 +4,7 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { DataSource } from 'typeorm';
 import { InitialSchema1735000000000 } from '../../src/database/migrations/1735000000000-InitialSchema';
 import { SearchIndexes1735000000001 } from '../../src/database/migrations/1735000000001-SearchIndexes';
+import { Users1735000000002 } from '../../src/database/migrations/1735000000002-Users';
 
 // Jest's globalSetup runs outside the normal Jest module sandbox (plain
 // Node require, no moduleNameMapper), so anything reachable from here must
@@ -32,7 +33,11 @@ export default async function globalSetup(): Promise<void> {
     type: 'postgres',
     ...connection,
     entities: [],
-    migrations: [InitialSchema1735000000000, SearchIndexes1735000000001],
+    migrations: [
+      InitialSchema1735000000000,
+      SearchIndexes1735000000001,
+      Users1735000000002,
+    ],
   });
 
   await dataSource.initialize();

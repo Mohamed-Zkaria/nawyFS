@@ -3,12 +3,16 @@ import { ConfigService } from '@nestjs/config';
 import { Env } from '@/config/env.validation';
 import {
   AppConfig,
+  BcryptConfig,
   DbConfig,
+  JwtConfig,
   LoggingConfig,
   SwaggerConfig,
   UploadsConfig,
   toAppConfig,
+  toBcryptConfig,
   toDbConfig,
+  toJwtConfig,
   toLoggingConfig,
   toSwaggerConfig,
   toUploadsConfig,
@@ -46,6 +50,14 @@ export class AppConfigService {
     return toUploadsConfig(this.snapshot());
   }
 
+  get jwt(): JwtConfig {
+    return toJwtConfig(this.snapshot());
+  }
+
+  get bcrypt(): BcryptConfig {
+    return toBcryptConfig(this.snapshot());
+  }
+
   private snapshot(): Env {
     return {
       NODE_ENV: this.configService.get('NODE_ENV', { infer: true }),
@@ -72,6 +84,18 @@ export class AppConfigService {
       DB_LOGGING: this.configService.get('DB_LOGGING', { infer: true }),
       DB_POOL_MAX: this.configService.get('DB_POOL_MAX', { infer: true }),
       PUBLIC_UPLOADS_PATH: this.configService.get('PUBLIC_UPLOADS_PATH', {
+        infer: true,
+      }),
+      JWT_SECRET: this.configService.get('JWT_SECRET', { infer: true }),
+      JWT_EXPIRES_IN: this.configService.get('JWT_EXPIRES_IN', {
+        infer: true,
+      }),
+      JWT_ISSUER: this.configService.get('JWT_ISSUER', { infer: true }),
+      BCRYPT_SALT_ROUNDS: this.configService.get('BCRYPT_SALT_ROUNDS', {
+        infer: true,
+      }),
+      ADMIN_EMAIL: this.configService.get('ADMIN_EMAIL', { infer: true }),
+      ADMIN_PASSWORD: this.configService.get('ADMIN_PASSWORD', {
         infer: true,
       }),
     };

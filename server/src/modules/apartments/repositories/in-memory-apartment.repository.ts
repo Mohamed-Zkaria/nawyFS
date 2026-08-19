@@ -2,6 +2,7 @@ import { Apartment } from '@/modules/apartments/entities/apartment.entity';
 import {
   ApartmentFilter,
   ApartmentRepositoryPort,
+  CreateApartmentData,
 } from '@/modules/apartments/apartment.repository.port';
 import { ApartmentSortBy } from '@/modules/apartments/dto/query-apartments.dto';
 
@@ -65,5 +66,17 @@ export class InMemoryApartmentRepository implements ApartmentRepositoryPort {
   findById(id: string): Promise<Apartment | null> {
     const found = this.apartments.find((a) => a.id === id && !a.deletedAt);
     return Promise.resolve(found ?? null);
+  }
+
+  save(data: CreateApartmentData): Promise<Apartment> {
+    const apartment = new Apartment();
+    Object.assign(apartment, data);
+    apartment.id = `saved-${this.apartments.length + 1}`;
+    apartment.createdAt = new Date();
+    apartment.updatedAt = new Date();
+    apartment.deletedAt = null;
+    apartment.images = [];
+    this.apartments.push(apartment);
+    return Promise.resolve(apartment);
   }
 }

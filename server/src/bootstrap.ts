@@ -37,8 +37,9 @@ export function configureApp(app: INestApplication): void {
       app,
       new DocumentBuilder()
         .setTitle('Nawy Apartments API')
-        .setDescription('Apartment listing, detail, and search API')
+        .setDescription('Apartment listing, detail, search, and admin API')
         .setVersion('1.0')
+        .addBearerAuth()
         .build(),
     );
     SwaggerModule.setup(cfg.swagger.path, app, document);

@@ -32,6 +32,16 @@ export interface UploadsConfig {
   publicPath: string;
 }
 
+export interface JwtConfig {
+  secret: string;
+  expiresInSeconds: number;
+  issuer: string;
+}
+
+export interface BcryptConfig {
+  saltRounds: number;
+}
+
 export function toAppConfig(env: Env): AppConfig {
   return {
     port: env.PORT,
@@ -71,5 +81,19 @@ export function toDbConfig(env: Env): DbConfig {
 export function toUploadsConfig(env: Env): UploadsConfig {
   return {
     publicPath: env.PUBLIC_UPLOADS_PATH,
+  };
+}
+
+export function toJwtConfig(env: Env): JwtConfig {
+  return {
+    secret: env.JWT_SECRET,
+    expiresInSeconds: env.JWT_EXPIRES_IN,
+    issuer: env.JWT_ISSUER,
+  };
+}
+
+export function toBcryptConfig(env: Env): BcryptConfig {
+  return {
+    saltRounds: env.BCRYPT_SALT_ROUNDS,
   };
 }

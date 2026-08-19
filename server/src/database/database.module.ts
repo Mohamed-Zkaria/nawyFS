@@ -5,6 +5,7 @@ import { ConfigModule } from '@/config/config.module';
 import { Project } from '@/modules/projects/entities/project.entity';
 import { Apartment } from '@/modules/apartments/entities/apartment.entity';
 import { ApartmentImage } from '@/modules/apartments/entities/apartment-image.entity';
+import { User } from '@/modules/users/entities/user.entity';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { ApartmentImage } from '@/modules/apartments/entities/apartment-image.en
         logging: cfg.db.logging,
         extra: { max: cfg.db.poolMax },
         synchronize: false,
-        entities: [Project, Apartment, ApartmentImage],
+        entities: [Project, Apartment, ApartmentImage, User],
       }),
     }),
   ],

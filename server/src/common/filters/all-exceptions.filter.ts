@@ -6,7 +6,13 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { QueryFailedError } from 'typeorm';
 import { ErrorCode } from '@/common/constants/error-codes';
+
+interface PostgresDriverError {
+  code?: string;
+  constraint?: string;
+}
 
 interface ResolvedError {
   statusCode: number;
@@ -54,6 +60,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 
   private resolve(exception: unknown): ResolvedError {
+    if (exception instanceof QueryFailedError) {
+      const driverError = (exception as { driverError?: PostgresDriverError })
+        .driverError;
+
+      if (driverError?.code === '23505') {
+        const isUnitConflict =
+          driverError.constraint === 'uq_apartments_project_unit';
+        return {
+          statusCode: 409,
+          code: isUnitConflict
+            ? ErrorCode.UNIT_ALREADY_EXISTS
+            : ErrorCode.CONFLICT,
+          message: isUnitConflict
+            ? 'A unit with this number already exists in this project'
+            : 'Resource already exists',
+        };
+      }
+    }
+
     if (exception instanceof HttpException) {
       const statusCode = exception.getStatus();
       const body = exception.getResponse();

@@ -23,7 +23,19 @@ describe('validateEnv', () => {
       DB_LOGGING: false,
       DB_POOL_MAX: 10,
       PUBLIC_UPLOADS_PATH: '/uploads',
+      JWT_SECRET:
+        'dev_only_insecure_secret_change_me_in_production_env_1234567890',
+      JWT_EXPIRES_IN: 3600,
+      JWT_ISSUER: 'nawy-apartments',
+      BCRYPT_SALT_ROUNDS: 12,
+      ADMIN_EMAIL: 'admin@nawy.local',
+      ADMIN_PASSWORD: 'ChangeMe_Admin123!',
     });
+  });
+
+  it('defaults BCRYPT_SALT_ROUNDS to 4 in the test environment', () => {
+    const env = validateEnv({ NODE_ENV: 'test' });
+    expect(env.BCRYPT_SALT_ROUNDS).toBe(4);
   });
 
   it('coerces and accepts a valid explicit env', () => {
@@ -33,6 +45,8 @@ describe('validateEnv', () => {
       HOST: '127.0.0.1',
       LOG_PRETTY: 'false',
       SWAGGER_ENABLED: 'false',
+      JWT_SECRET: 'a-real-production-secret-that-is-at-least-32-chars',
+      ADMIN_PASSWORD: 'a-real-production-admin-password',
     });
 
     expect(env.NODE_ENV).toBe('production');
@@ -40,6 +54,24 @@ describe('validateEnv', () => {
     expect(env.HOST).toBe('127.0.0.1');
     expect(env.LOG_PRETTY).toBe(false);
     expect(env.SWAGGER_ENABLED).toBe(false);
+  });
+
+  it('refuses to boot in production with the default JWT_SECRET', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        ADMIN_PASSWORD: 'a-real-production-admin-password',
+      }),
+    ).toThrow(/default JWT_SECRET in production/);
+  });
+
+  it('refuses to boot in production with the default ADMIN_PASSWORD', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'a-real-production-secret-that-is-at-least-32-chars',
+      }),
+    ).toThrow(/default ADMIN_PASSWORD in production/);
   });
 
   it('fails fast with a readable message on a non-numeric PORT', () => {

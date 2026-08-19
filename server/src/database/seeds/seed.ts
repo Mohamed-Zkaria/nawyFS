@@ -1,6 +1,9 @@
 import { DataSource } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 import { Project } from '@/modules/projects/entities/project.entity';
 import { Apartment } from '@/modules/apartments/entities/apartment.entity';
+import { User } from '@/modules/users/entities/user.entity';
+import { UserRole } from '@/modules/users/entities/user-role.enum';
 
 // Deterministic seed data — no @faker-js/faker. Random data means flaky
 // assertions and unreproducible failures (ImplementationPlan.md §12).
@@ -136,7 +139,40 @@ async function upsertApartments(
   }
 }
 
+// Matches env.validation.ts's DEFAULT_ADMIN_PASSWORD — duplicated here
+// because this script runs outside Nest's DI/ConfigModule entirely (see
+// data-source.ts), so it can't import AppConfigService.
+const DEFAULT_ADMIN_PASSWORD = 'ChangeMe_Admin123!';
+
+async function upsertAdmin(dataSource: DataSource): Promise<void> {
+  const email = (process.env.ADMIN_EMAIL ?? 'admin@nawy.local').toLowerCase();
+  const password = process.env.ADMIN_PASSWORD ?? DEFAULT_ADMIN_PASSWORD;
+
+  if (
+    process.env.NODE_ENV === 'production' &&
+    password === DEFAULT_ADMIN_PASSWORD
+  ) {
+    console.warn(
+      'Skipping admin seed: refusing to seed the default ADMIN_PASSWORD in production.',
+    );
+    return;
+  }
+
+  const repo = dataSource.getRepository(User);
+  const passwordHash = await bcrypt.hash(password, 12);
+  const existing = await repo.findOne({ where: { email } });
+
+  if (existing) {
+    existing.passwordHash = passwordHash;
+    existing.role = UserRole.ADMIN;
+    await repo.save(existing);
+  } else {
+    await repo.save(repo.create({ email, passwordHash, role: UserRole.ADMIN }));
+  }
+}
+
 export async function runSeed(dataSource: DataSource): Promise<void> {
   const projects = await upsertProjects(dataSource);
   await upsertApartments(dataSource, projects);
+  await upsertAdmin(dataSource);
 }

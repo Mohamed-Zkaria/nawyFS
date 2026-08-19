@@ -1,9 +1,14 @@
 import { ApartmentsService } from '@/modules/apartments/apartments.service';
 import { ApartmentMapper } from '@/modules/apartments/mappers/apartment.mapper';
 import { InMemoryApartmentRepository } from '@/modules/apartments/repositories/in-memory-apartment.repository';
+import { InMemoryProjectRepository } from '@/modules/projects/repositories/in-memory-project.repository';
 import { ApartmentSortBy } from '@/modules/apartments/dto/query-apartments.dto';
 import { QueryApartmentsDto } from '@/modules/apartments/dto/query-apartments.dto';
-import { ApartmentNotFoundException } from '@/common/exceptions/domain.exceptions';
+import { CreateApartmentDto } from '@/modules/apartments/dto/create-apartment.dto';
+import {
+  ApartmentNotFoundException,
+  ProjectNotFoundException,
+} from '@/common/exceptions/domain.exceptions';
 import { AppConfigService } from '@/config/app-config.service';
 import {
   createProject,
@@ -31,15 +36,30 @@ function query(
   return Object.assign(dto, overrides);
 }
 
+function createDto(
+  overrides: Partial<CreateApartmentDto> = {},
+): CreateApartmentDto {
+  const dto = new CreateApartmentDto();
+  dto.unitName = overrides.unitName ?? 'Test Unit';
+  dto.unitNumber = overrides.unitNumber ?? 'A-1';
+  dto.price = overrides.price ?? 1000000;
+  dto.bedrooms = overrides.bedrooms ?? 2;
+  dto.bathrooms = overrides.bathrooms ?? 1;
+  dto.areaSqm = overrides.areaSqm ?? 90;
+  return Object.assign(dto, overrides);
+}
+
 describe('ApartmentsService', () => {
   let repo: InMemoryApartmentRepository;
+  let projectRepo: InMemoryProjectRepository;
   let service: ApartmentsService;
 
   beforeEach(() => {
     resetProjectFactory();
     resetApartmentFactory();
     repo = new InMemoryApartmentRepository();
-    service = new ApartmentsService(repo, createMapper());
+    projectRepo = new InMemoryProjectRepository();
+    service = new ApartmentsService(repo, projectRepo, createMapper());
   });
 
   it('paginates results and reports correct meta', async () => {
@@ -103,5 +123,49 @@ describe('ApartmentsService', () => {
 
     expect(detail.id).toBe(apartment.id);
     expect(detail.projectName).toBe(project.name);
+  });
+
+  describe('create', () => {
+    it('creates an apartment under an existing project by projectId', async () => {
+      const project = createProject();
+      projectRepo.seed([project]);
+
+      const detail = await service.create(
+        createDto({ projectId: project.id, unitNumber: 'A-1' }),
+      );
+
+      expect(detail.projectId).toBe(project.id);
+      expect(detail.unitNumber).toBe('A-1');
+    });
+
+    it('throws ProjectNotFoundException for an unknown projectId', async () => {
+      await expect(
+        service.create(createDto({ projectId: 'missing-project' })),
+      ).rejects.toBeInstanceOf(ProjectNotFoundException);
+    });
+
+    it('auto-creates a project when only projectName is given', async () => {
+      const detail = await service.create(
+        createDto({ projectName: 'Brand New Project', projectCity: 'Cairo' }),
+      );
+
+      const projects = await projectRepo.findAll();
+      expect(projects).toHaveLength(1);
+      expect(projects[0].name).toBe('Brand New Project');
+      expect(projects[0].slug).toBe('brand-new-project');
+      expect(detail.projectId).toBe(projects[0].id);
+    });
+
+    it('reuses an existing project when projectName matches one already there', async () => {
+      const project = createProject({ name: 'Existing Project' });
+      projectRepo.seed([project]);
+
+      await service.create(
+        createDto({ projectName: 'Existing Project', projectCity: 'Cairo' }),
+      );
+
+      const projects = await projectRepo.findAll();
+      expect(projects).toHaveLength(1);
+    });
   });
 });

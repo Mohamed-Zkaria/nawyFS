@@ -5,6 +5,7 @@ import { Apartment } from '@/modules/apartments/entities/apartment.entity';
 import {
   ApartmentFilter,
   ApartmentRepositoryPort,
+  CreateApartmentData,
 } from '@/modules/apartments/apartment.repository.port';
 import { ApartmentSortBy } from '@/modules/apartments/dto/query-apartments.dto';
 import { escapeLike } from '@/common/utils/escape-like';
@@ -75,5 +76,9 @@ export class TypeOrmApartmentRepository implements ApartmentRepositoryPort {
       where: { id },
       relations: ['project', 'images'],
     });
+  }
+
+  save(data: CreateApartmentData): Promise<Apartment> {
+    return this.repo.save(this.repo.create(data));
   }
 }

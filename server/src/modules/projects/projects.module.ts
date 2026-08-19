@@ -15,5 +15,6 @@ import { ProjectsController } from '@/modules/projects/projects.controller';
     ProjectMapper,
     { provide: ProjectRepositoryPort, useClass: TypeOrmProjectRepository },
   ],
+  exports: [ProjectRepositoryPort],
 })
 export class ProjectsModule {}
