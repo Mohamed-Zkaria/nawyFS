@@ -37,11 +37,24 @@ const baseEnvSchema = z.object({
   DB_LOGGING: booleanEnvVar(false),
   DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
 
-  // Only the public URL prefix is needed until Phase 4's full storage
-  // feature lands (UPLOAD_DIR, size limits, etc.) — the mapper needs to
-  // compose image URLs from config starting now, even though no apartment
-  // has any images yet.
-  PUBLIC_UPLOADS_PATH: z.string().min(1).default('/uploads'),
+  CORS_ORIGINS: z
+    .string()
+    .default('http://localhost:3000')
+    .transform((value) =>
+      value
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ),
+  CORS_CREDENTIALS: booleanEnvVar(true),
+
+  // Limit is left unset here — the transform below defaults it high in
+  // NODE_ENV=test (so the e2e suite's dozens of auth requests in a few
+  // seconds don't 429 themselves) and to the real production value
+  // otherwise. Same pattern as BCRYPT_SALT_ROUNDS below.
+  RATE_LIMIT_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  RATE_LIMIT_LIMIT: z.coerce.number().int().positive().optional(),
+  AUTH_RATE_LIMIT_LIMIT: z.coerce.number().int().positive().optional(),
 
   JWT_SECRET: z
     .string()
@@ -62,6 +75,10 @@ export const envSchema = baseEnvSchema
     ...env,
     BCRYPT_SALT_ROUNDS:
       env.BCRYPT_SALT_ROUNDS ?? (env.NODE_ENV === 'test' ? 4 : 12),
+    RATE_LIMIT_LIMIT:
+      env.RATE_LIMIT_LIMIT ?? (env.NODE_ENV === 'test' ? 10_000 : 120),
+    AUTH_RATE_LIMIT_LIMIT:
+      env.AUTH_RATE_LIMIT_LIMIT ?? (env.NODE_ENV === 'test' ? 10_000 : 10),
   }))
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production') {

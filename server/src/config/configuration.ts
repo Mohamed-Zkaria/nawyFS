@@ -28,8 +28,15 @@ export interface DbConfig {
   poolMax: number;
 }
 
-export interface UploadsConfig {
-  publicPath: string;
+export interface CorsConfig {
+  origins: string[];
+  credentials: boolean;
+}
+
+export interface RateLimitConfig {
+  ttlMs: number;
+  limit: number;
+  authLimit: number;
 }
 
 export interface JwtConfig {
@@ -78,9 +85,18 @@ export function toDbConfig(env: Env): DbConfig {
   };
 }
 
-export function toUploadsConfig(env: Env): UploadsConfig {
+export function toCorsConfig(env: Env): CorsConfig {
   return {
-    publicPath: env.PUBLIC_UPLOADS_PATH,
+    origins: env.CORS_ORIGINS,
+    credentials: env.CORS_CREDENTIALS,
+  };
+}
+
+export function toRateLimitConfig(env: Env): RateLimitConfig {
+  return {
+    ttlMs: env.RATE_LIMIT_TTL_MS,
+    limit: env.RATE_LIMIT_LIMIT,
+    authLimit: env.AUTH_RATE_LIMIT_LIMIT,
   };
 }
 

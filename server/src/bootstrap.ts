@@ -3,6 +3,7 @@ import {
   ValidationPipe,
   VersioningType,
 } from '@nestjs/common';
+import helmet from 'helmet';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppConfigService } from '@/config/app-config.service';
 import { ResponseEnvelopeInterceptor } from '@/common/interceptors/response-envelope.interceptor';
@@ -11,8 +12,15 @@ import { AllExceptionsFilter } from '@/common/filters/all-exceptions.filter';
 export function configureApp(app: INestApplication): void {
   const cfg = app.get(AppConfigService);
 
+  app.use(helmet());
+
+  app.enableCors({
+    origin: cfg.cors.origins,
+    credentials: cfg.cors.credentials,
+  });
+
   app.setGlobalPrefix(cfg.app.globalPrefix, {
-    exclude: ['health', 'uploads/(.*)'],
+    exclude: ['health'],
   });
 
   app.enableVersioning({

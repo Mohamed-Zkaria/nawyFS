@@ -27,5 +27,8 @@ import { User } from '@/modules/users/entities/user.entity';
       }),
     }),
   ],
+  // Re-exported so HealthModule can inject DataSource for a real DB-aware
+  // liveness check without opening a second connection.
+  exports: [TypeOrmModule],
 })
 export class DatabaseModule {}

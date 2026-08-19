@@ -27,6 +27,8 @@ const DEFAULT_CODE_BY_STATUS: Record<number, string> = {
   403: ErrorCode.FORBIDDEN,
   404: ErrorCode.NOT_FOUND,
   409: ErrorCode.CONFLICT,
+  429: ErrorCode.TOO_MANY_REQUESTS,
+  503: ErrorCode.SERVICE_UNAVAILABLE,
 };
 
 @Catch()

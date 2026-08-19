@@ -22,7 +22,11 @@ describe('validateEnv', () => {
       DB_SSL: false,
       DB_LOGGING: false,
       DB_POOL_MAX: 10,
-      PUBLIC_UPLOADS_PATH: '/uploads',
+      CORS_ORIGINS: ['http://localhost:3000'],
+      CORS_CREDENTIALS: true,
+      RATE_LIMIT_TTL_MS: 60_000,
+      RATE_LIMIT_LIMIT: 120,
+      AUTH_RATE_LIMIT_LIMIT: 10,
       JWT_SECRET:
         'dev_only_insecure_secret_change_me_in_production_env_1234567890',
       JWT_EXPIRES_IN: 3600,
@@ -36,6 +40,12 @@ describe('validateEnv', () => {
   it('defaults BCRYPT_SALT_ROUNDS to 4 in the test environment', () => {
     const env = validateEnv({ NODE_ENV: 'test' });
     expect(env.BCRYPT_SALT_ROUNDS).toBe(4);
+  });
+
+  it('raises rate limits in the test environment so e2e runs do not 429 themselves', () => {
+    const env = validateEnv({ NODE_ENV: 'test' });
+    expect(env.RATE_LIMIT_LIMIT).toBe(10_000);
+    expect(env.AUTH_RATE_LIMIT_LIMIT).toBe(10_000);
   });
 
   it('coerces and accepts a valid explicit env', () => {

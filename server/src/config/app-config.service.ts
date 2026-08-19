@@ -4,18 +4,20 @@ import { Env } from '@/config/env.validation';
 import {
   AppConfig,
   BcryptConfig,
+  CorsConfig,
   DbConfig,
   JwtConfig,
   LoggingConfig,
+  RateLimitConfig,
   SwaggerConfig,
-  UploadsConfig,
   toAppConfig,
   toBcryptConfig,
+  toCorsConfig,
   toDbConfig,
   toJwtConfig,
   toLoggingConfig,
+  toRateLimitConfig,
   toSwaggerConfig,
-  toUploadsConfig,
 } from '@/config/configuration';
 
 @Injectable()
@@ -46,8 +48,12 @@ export class AppConfigService {
     return toDbConfig(this.snapshot());
   }
 
-  get uploads(): UploadsConfig {
-    return toUploadsConfig(this.snapshot());
+  get cors(): CorsConfig {
+    return toCorsConfig(this.snapshot());
+  }
+
+  get rateLimit(): RateLimitConfig {
+    return toRateLimitConfig(this.snapshot());
   }
 
   get jwt(): JwtConfig {
@@ -83,7 +89,17 @@ export class AppConfigService {
       DB_SSL: this.configService.get('DB_SSL', { infer: true }),
       DB_LOGGING: this.configService.get('DB_LOGGING', { infer: true }),
       DB_POOL_MAX: this.configService.get('DB_POOL_MAX', { infer: true }),
-      PUBLIC_UPLOADS_PATH: this.configService.get('PUBLIC_UPLOADS_PATH', {
+      CORS_ORIGINS: this.configService.get('CORS_ORIGINS', { infer: true }),
+      CORS_CREDENTIALS: this.configService.get('CORS_CREDENTIALS', {
+        infer: true,
+      }),
+      RATE_LIMIT_TTL_MS: this.configService.get('RATE_LIMIT_TTL_MS', {
+        infer: true,
+      }),
+      RATE_LIMIT_LIMIT: this.configService.get('RATE_LIMIT_LIMIT', {
+        infer: true,
+      }),
+      AUTH_RATE_LIMIT_LIMIT: this.configService.get('AUTH_RATE_LIMIT_LIMIT', {
         infer: true,
       }),
       JWT_SECRET: this.configService.get('JWT_SECRET', { infer: true }),
