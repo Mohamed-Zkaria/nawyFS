@@ -186,36 +186,6 @@ reflect original intent) predate several decisions made while building:
   this mostly matters for direct API access and Swagger — but it's the
   correct default regardless of what today's frontend happens to use.
 
-## Patterns deliberately not used
-
-Restraint is invisible unless it's named — a reviewer can't tell "didn't
-think of it" from "considered and rejected" without this list:
-
-- **CQRS** — command/query buses for a dozen endpoints is ceremony with no
-  payoff at this size.
-- **Full hexagonal architecture with duplicated domain models** — a pure
-  `domain/Apartment` class *plus* a TypeORM entity *plus* bidirectional
-  mappers roughly doubles the file count for a 3-table schema. TypeORM
-  entities *are* the domain model here; the DTO layer is the one-way
-  boundary.
-- **Event sourcing / outbox / sagas** — no distributed transactions or
-  cross-service consistency problems exist in this system.
-- **Generic `BaseCrudService<T>`** — looks DRY on paper, breaks LSP/OCP the
-  first time one entity's rules diverge (which apartments' project
-  resolution already does).
-- **A file-upload/storage pipeline** — see "Deviations" above.
-- **`nestjs-pino` / structured logging** — considered for Phase 5, cut for
-  time; Nest's built-in logger is what's shipped. Noted under "What's next."
-
-## Deliberate non-goals
-
-No refresh-token rotation (access token + 1h TTL is the whole story — a
-rotation/reuse-detection/revocation store is 400+ lines for zero grading
-benefit here), no password reset / email verification / SMTP, no OAuth, no
-2FA, no permission-matrix RBAC (two roles is enough), no account lockout
-(rate limiting covers the same threat), no image upload/storage service
-(see "Deviations"), no client-side test suite (see "What's next").
-
 ## Environment variables
 
 Every var has a working default for local dev — `server/.env.example` and
